@@ -1319,8 +1319,8 @@ the start of the tangle process. This is done by calling =bootstrap= within the
 
 It's useful to have some basic personal information
 #+begin_src emacs-lisp
-(setq user-full-name "TEC"
-      user-mail-address "tec@tecosaur.com")
+(setq user-full-name "Himanshu Singh"
+      user-mail-address "to.himanshu.singh@gmail.com")
 #+end_src
 Apparently this is used by ~GPG~, and all sorts of other things.
 
@@ -8192,7 +8192,7 @@ be nice to have a function to convert =org-ref= citations to =org-cite= forms.
                                ("notecite" . "/l/b") ("Notecite" . "/l/bc")
                                ("pnotecite" . "/l") ("Pnotecite" . "/l/bc")))
            (cite-regexp (rx (regexp (regexp-opt (mapcar #'car cite-conversions) t))
-                            ":" (group (+ (not (any "\n 	,.)]}")))))))
+                            ":" (group (+ (not (any "\n   ,.)]}")))))))
       (save-excursion
         (goto-char (point-min))
         (while (re-search-forward cite-regexp nil t)
