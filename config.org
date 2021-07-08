@@ -315,8 +315,8 @@ for more info).
 ** Personal Information
 It's useful to have some basic personal information
 #+begin_src emacs-lisp
-(setq user-full-name "TEC"
-      user-mail-address "tec@tecosaur.com")
+(setq user-full-name "Himanshu Singh"
+      user-mail-address "to.himanshu.singh@gmail.com")
 #+end_src
 Apparently this is used by ~GPG~, and all sorts of other things.
 
