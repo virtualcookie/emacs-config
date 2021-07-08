@@ -1692,7 +1692,8 @@ prompt recognition.
 #+begin_src emacs-lisp
 (after! tramp
   (setenv "SHELL" "/bin/bash")
-  (setq tramp-shell-prompt-pattern "\\(?:^\\|\\)[^]#$%>\n]*#?[]#$%>] *\\(\\[[0-9;]*[a-zA-Z] *\\)*")) ;; default + 
+  (setq tramp-shell-prompt-pattern "\\(?:^\\|
+\\)[^]#$%>\n]*#?[]#$%>] *\\(\\[[0-9;]*[a-zA-Z] *\\)*")) ;; default + 
 #+end_src
 
 **** Troubleshooting
