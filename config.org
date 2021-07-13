@@ -315,8 +315,8 @@ for more info).
 ** Personal Information
 It's useful to have some basic personal information
 #+begin_src emacs-lisp
-(setq user-full-name "TEC"
-      user-mail-address "tec@tecosaur.com")
+(setq user-full-name "Himanshu Singh"
+      user-mail-address "to.himanshu.singh@gmail.com")
 #+end_src
 Apparently this is used by ~GPG~, and all sorts of other things.
 
@@ -424,6 +424,12 @@ I'd much rather have my new buffers in ~org-mode~ than ~fundamental-mode~, hence
 #+end_src
 For some reason this + the mixed pitch hook causes issues with hydra and so I'll
 just need to resort to =SPC b o= for now.
+*** Plantuml configuration
+Set the location of the plantuml jar file 
+#+begin_src emacs-lisp
+(setq plantuml-jar-path "~/.emacs.d/.local/etc/plantuml.jar")
+    (setq plantuml-default-exec-mode 'jar)
+#+end_src
 ** Doom configuration
 *** Modules
 :PROPERTIES:
@@ -532,7 +538,7 @@ ophints                      ; highlight the region an operation acts on
 ;;(tabs                      ; an tab bar for Emacs
 ;;  +centaur-tabs)           ; ... with prettier tabs
 treemacs                     ; a project drawer, like neotree but cooler
-;;unicode                    ; extended unicode support for various languages
+unicode                    ; extended unicode support for various languages
 vc-gutter                    ; vcs diff in the fringe
 vi-tilde-fringe              ; fringe tildes to mark beyond EOB
 (window-select +numbers)     ; visually switch windows
@@ -553,7 +559,7 @@ multiple-cursors             ; editing in many places at once
 ;;parinfer                   ; turn lisp into python, sort of
 rotate-text                  ; cycle region at point between text candidates
 snippets                     ; my elves. They type so I don't have to
-;;word-wrap                  ; soft wrapping with language-aware indent
+word-wrap                  ; soft wrapping with language-aware indent
 #+end_src
 
 #+name: doom-emacs
@@ -586,7 +592,7 @@ ansible                      ; a crucible for infrastructure as code
 ;;debugger                   ; FIXME stepping through code, to help you add bugs
 ;;direnv                     ; be direct about your environment
 docker                       ; port everything to containers
-;;editorconfig               ; let someone else argue about tabs vs spaces
+editorconfig               ; let someone else argue about tabs vs spaces
 ;;ein                        ; tame Jupyter notebooks with emacs
 (eval +overlay)              ; run code, run (also, repls)
 ;;gist                       ; interacting with github gists
@@ -610,6 +616,7 @@ upload                       ; map local to remote projects via ssh/ftp
 
 #+name: doom-os
 #+begin_src emacs-lisp
+(:if IS-MAC macos)           ; improve compatibility with macOS
 tty                          ; improve the terminal Emacs experience
 #+end_src
 
@@ -622,7 +629,7 @@ associated file.
 #+begin_src emacs-lisp
 ;;agda                       ; types of types of types of types...
 ;;beancount                  ; mind the GAAP
-;;cc                         ; C/C++/Obj-C madness
+cc                           ; C/C++/Obj-C madness
 ;;clojure                    ; java with a lisp
 ;;common-lisp                ; if you've seen one lisp, you've seen them all
 ;;coq                        ; proofs-as-programs
@@ -645,10 +652,10 @@ ess                          ; emacs speaks statistics
 ;;hy                         ; readability of scheme w/ speed of python
 ;;idris                      ;
 json                         ; At least it ain't XML
-;;(java +meghanada)          ; the poster child for carpal tunnel syndrome
+(java +meghanada)            ; the poster child for carpal tunnel syndrome
 (javascript +lsp)            ; all(hope(abandon(ye(who(enter(here))))))
 (julia +lsp)                 ; Python, R, and MATLAB in a blender
-;;kotlin                     ; a better, slicker Java(Script)
+kotlin                       ; a better, slicker Java(Script)
 (latex                       ; writing papers in Emacs has never been so fun
  +latexmk                    ; what else would you use?
  +cdlatex                    ; quick maths symbols
@@ -673,7 +680,7 @@ markdown                     ; writing docs for people to ignore
  +present                    ; using org-mode for presentations
  +roam2)                     ; wander around notes
 ;;php                        ; perl's insecure younger brother
-;;plantuml                   ; diagrams for confusing people more
+plantuml                     ; diagrams for confusing people more
 ;;purescript                 ; javascript, but functional
 (python +lsp +pyright)       ; beautiful is better than ugly
 ;;qt                         ; the 'cutest' gui framework ever
@@ -688,7 +695,7 @@ scheme                       ; a fully conniving family of lisps
 sh                           ; she sells {ba,z,fi}sh shells on the C xor
 ;;sml                        ; no, the /other/ ML
 ;;solidity                   ; do you need a blockchain? No.
-;;swift                      ; who asked for emoji variables?
+swift                      ; who asked for emoji variables?
 ;;terra                      ; Earth and Moon in alignment for performance.
 web                          ; the tubes
 yaml                         ; JSON, but readable
@@ -708,7 +715,7 @@ I couldn't resist the Email and Feed modules.
 
 #+name: doom-app
 #+begin_src emacs-lisp
-;;calendar                   ; A dated approach to timetabling
+calendar                   ; A dated approach to timetabling
 ;;emms                       ; Multimedia in Emacs is music to my ears
 everywhere                   ; *leave* Emacs!? You must be joking.
 irc                          ; how neckbeards socialize
@@ -4851,11 +4858,12 @@ to make that right again, and this package makes that even easier to do.
 [[xkcd:1319]]
 **** Tweaking defaults
 #+begin_src emacs-lisp
-(setq org-directory "~/.org"                      ; let's put files here
+(setq org-directory "~/org"                      ; let's put files here
       org-use-property-inheritance t              ; it's convenient to have properties inherited
       org-log-done 'time                          ; having the time a item is done sounds convenient
       org-list-allow-alphabetical t               ; have a. A. a) A) list bullets
-      org-export-in-background t                  ; run export processes in external emacs process
+      org-export-in-background nil                  ; run export processes in external emacs process
+      org-export-async-debug nil                  ; fixes process "org-export-process" exited abnormally
       org-catch-invisible-edits 'smart            ; try not to accidently do weird stuff in invisible regions
       org-export-with-sub-superscripts '{})       ; don't treat lone _ / ^ as sub/superscripts, require _{} / ^{}
 #+end_src
@@ -5308,7 +5316,8 @@ set up org-capture.
 
   (setq doct-after-conversion-functions '(+doct-iconify-capture-templates))
 
-  (defvar +org-capture-recipies  "~/Desktop/TEC/Organisation/recipies.org")
+  ;; (defvar +org-capture-recipies  "~/Desktop/TEC/Organisation/recipies.org")
+  (defvar +org-capture-recipies  "~/org/personal/household/cookbook.org")
 
   (defun set-org-capture-templates ()
     (setq org-capture-templates
@@ -5580,13 +5589,13 @@ no modeline.
 I'll just set this to be within =Organisation= folder for now, in the future it
 could be worth seeing if I could hook this up to a [[https://nextcloud.com/][Nextcloud]] instance.
 #+begin_src emacs-lisp :noweb-ref none :tangle yes
-(setq org-roam-directory "~/Desktop/TEC/Organisation/Roam/")
+(setq org-roam-directory "~/Box/org/roam/")
 #+end_src
 
 That said, if the directory doesn't exist we likely don't want to be using roam.
 Since we don't want to trigger errors (which will happen as soon as roam tries
 to initialise), let's not load roam.
-#+begin_src emacs-lisp :noweb-ref none :tangle (if (file-exists-p "~/Desktop/TEC/Organisation/Roam/") "no" "packages.el")
+#+begin_src emacs-lisp :noweb-ref none :tangle (if (file-exists-p "~/Box/org/roam/") "no" "packages.el")
 (package! org-roam :disable t)
 #+end_src
 ***** Modeline file name
@@ -9222,51 +9231,51 @@ Now, there are some symbols that aren't included in =inputenc=, but we should be
 able to handle anyway. For them we define a table of LaTeX translations
 
 #+name: latex-non-ascii-char-substitutions
-| Character | LaTeX |
-|-----------+-------|
-| ɑ         | \(\alpha\) |
-| β         | \(\beta\) |
-| γ         | \(\gamma\) |
-| δ         | \(\delta\) |
-| ε         | \(\epsilon\) |
-| ϵ         | \(\varepsilon\) |
-| ζ         | \(\zeta\) |
-| η         | \(\eta\) |
-| θ         | \(\theta\) |
-| ϑ         | \(\vartheta\) |
-| ι         | \(\iota\) |
-| κ         | \(\kappa\) |
-| λ         | \(\lambda\) |
-| μ         | \(\mu\) |
-| ν         | \(\nu\) |
-| ξ         | \(\xi\) |
-| π         | \(\pi\) |
-| ϖ         | \(\varpi\) |
-| ρ         | \(\rho\) |
+| Character | LaTeX       |
+|-----------+-------------|
+| ɑ         | \(\alpha\)       |
+| β         | \(\beta\)       |
+| γ         | \(\gamma\)       |
+| δ         | \(\delta\)       |
+| ε         | \(\epsilon\)       |
+| ϵ         | \(\varepsilon\)       |
+| ζ         | \(\zeta\)       |
+| η         | \(\eta\)       |
+| θ         | \(\theta\)       |
+| ϑ         | \(\vartheta\)       |
+| ι         | \(\iota\)       |
+| κ         | \(\kappa\)       |
+| λ         | \(\lambda\)       |
+| μ         | \(\mu\)       |
+| ν         | \(\nu\)       |
+| ξ         | \(\xi\)       |
+| π         | \(\pi\)       |
+| ϖ         | \(\varpi\)       |
+| ρ         | \(\rho\)       |
 | ϱ         | \(\varrho\) |
-| σ         | \(\sigma\) |
-| ς         | \(\varsigma\) |
-| τ         | \(\tau\) |
-| υ         | \(\upsilon\) |
-| ϕ         | \(\phi\) |
-| φ         | \(\varphi\) |
-| ψ         | \(\psi\) |
-| ω         | \(\omega\) |
-| Γ         | \(\Gamma\) |
-| Δ         | \(\Delta\) |
-| Θ         | \(\Theta\) |
-| Λ         | \(\Lambda\) |
-| Ξ         | \(\Xi\) |
-| Π         | \(\Pi\) |
-| Σ         | \(\Sigma\) |
-| Υ         | \(\Upsilon\) |
-| Φ         | \(\Phi\) |
-| Ψ         | \(\Psi\) |
-| Ω         | \(\Omega\) |
-| א         | \(\aleph\) |
-| ב         | \(\beth\) |
+| σ         | \(\sigma\)       |
+| ς         | \(\varsigma\)       |
+| τ         | \(\tau\)       |
+| υ         | \(\upsilon\)       |
+| ϕ         | \(\phi\)       |
+| φ         | \(\varphi\)       |
+| ψ         | \(\psi\)       |
+| ω         | \(\omega\)       |
+| Γ         | \(\Gamma\)       |
+| Δ         | \(\Delta\)       |
+| Θ         | \(\Theta\)       |
+| Λ         | \(\Lambda\)       |
+| Ξ         | \(\Xi\)       |
+| Π         | \(\Pi\)       |
+| Σ         | \(\Sigma\)       |
+| Υ         | \(\Upsilon\)       |
+| Φ         | \(\Phi\)       |
+| Ψ         | \(\Psi\)       |
+| Ω         | \(\Omega\)       |
+| א         | \(\aleph\)       |
+| ב         | \(\beth\)       |
 | ד         | \(\daleth\) |
-| ג         | \(\gimel\) |
+| ג         | \(\gimel\)       |
 
 #+name: gen-latex-non-ascii-char-substitutions
 #+begin_src emacs-lisp :noweb-ref none :var latex-non-ascii-char-substitutions=latex-non-ascii-char-substitutions
