@@ -1443,6 +1443,12 @@ I'd much rather have my new buffers in ~org-mode~ than ~fundamental-mode~, hence
 #+end_src
 For some reason this + the mixed pitch hook causes issues with hydra and so I'll
 just need to resort to =SPC b o= for now.
+*** Plantuml configuration
+Set the location of the plantuml jar file 
+#+begin_src emacs-lisp
+(setq plantuml-jar-path "~/.emacs.d/.local/etc/plantuml.jar")
+    (setq plantuml-default-exec-mode 'jar)
+#+end_src
 ** Doom configuration
 
 #+call: confpkg("Doom")
@@ -1581,7 +1587,7 @@ multiple-cursors             ; editing in many places at once
 ;;parinfer                   ; turn lisp into python, sort of
 rotate-text                  ; cycle region at point between text candidates
 snippets                     ; my elves. They type so I don't have to
-;;word-wrap                  ; soft wrapping with language-aware indent
+word-wrap                  ; soft wrapping with language-aware indent
 #+end_src
 
 #+name: doom-emacs
@@ -1615,7 +1621,7 @@ biblio                       ; Writes a PhD for you (citation needed)
 ;;debugger                   ; FIXME stepping through code, to help you add bugs
 ;;direnv                     ; be direct about your environment
 docker                       ; port everything to containers
-;;editorconfig               ; let someone else argue about tabs vs spaces
+editorconfig               ; let someone else argue about tabs vs spaces
 ;;ein                        ; tame Jupyter notebooks with emacs
 (eval +overlay)              ; run code, run (also, repls)
 ;;gist                       ; interacting with github gists
@@ -1640,6 +1646,7 @@ upload                       ; map local to remote projects via ssh/ftp
 
 #+name: doom-os
 #+begin_src emacs-lisp
+(:if IS-MAC macos)           ; improve compatibility with macOS
 tty                          ; improve the terminal Emacs experience
 #+end_src
 
@@ -1704,7 +1711,7 @@ nix                          ; I hereby declare "nix geht mehr!"
  +present                    ; using org-mode for presentations
  +roam2)                     ; wander around notes
 ;;php                        ; perl's insecure younger brother
-;;plantuml                   ; diagrams for confusing people more
+plantuml                     ; diagrams for confusing people more
 ;;purescript                 ; javascript, but functional
 (python +lsp +pyright)       ; beautiful is better than ugly
 ;;qt                         ; the 'cutest' gui framework ever
@@ -1719,7 +1726,7 @@ scheme                       ; a fully conniving family of lisps
 sh                           ; she sells {ba,z,fi}sh shells on the C xor
 ;;sml                        ; no, the /other/ ML
 ;;solidity                   ; do you need a blockchain? No.
-;;swift                      ; who asked for emoji variables?
+swift                      ; who asked for emoji variables?
 ;;terra                      ; Earth and Moon in alignment for performance.
 web                          ; the tubes
 yaml                         ; JSON, but readable
@@ -1750,7 +1757,7 @@ I couldn't resist the Email and Feed modules.
 
 #+name: doom-app
 #+begin_src emacs-lisp
-;;calendar                   ; A dated approach to timetabling
+calendar                   ; A dated approach to timetabling
 ;;emms                       ; Multimedia in Emacs is music to my ears
 everywhere                   ; *leave* Emacs!? You must be joking.
 irc                          ; how neckbeards socialize
@@ -7881,6 +7888,29 @@ to make that right again, and this package makes that even easier to do.
 #+begin_src emacs-lisp
 (use-package! org-pandoc-import
   :after org)
+  ;; Google Drive integration https://www.emacswiki.org/emacs/GoogleDocs
+;; https://github.com/prasmussen/gdrive
+(defvar gdocs-folder-id "1MGWas-zzpm8ktv2y32gQQRH5FcK9Gyi1"
+     "location for storing org to gdocs exported files, use 'gdrive list  -t <foldername>' to find the id")
+ (defun gdoc-export-buffer ()
+      "Export current buffer as google doc to folder identified by gdocs-folder-id"
+      (interactive)
+      (shell-command
+      (format "gdrive upload --mime text/plain --parent %s --file %s"
+          gdocs-folder-id buffer-file-name)))
+;;  gdrive import --parent '1MGWas-zzpm8ktv2y32gQQRH5FcK9Gyi1' 2021-06-16.txt
+(defun gdoc-import-buffer (doc)
+       "Import a file in gdocs-folder-id into current buffer"
+       (interactive
+       (list
+          (completing-read "Choose one: "
+                     (split-string
+                      (shell-command-to-string
+                       (format "gdrive list -q \"'%s' in parents\"" gdocs-folder-id)) "\n"))))
+       ;;  gdrive list -q "'1MGWas-zzpm8ktv2y32gQQRH5FcK9Gyi1' in parents"
+      (insert (replace-regexp-in-string (string ?\C-m) (string ?\C-j) (shell-command-to-string
+      (format "gdrive download -s --format txt --id %s" (car (split-string doc " ")))))))
+;; gdrive export --mime text/plain  1q-cDyKWyM1uzXrjwf0DJbN4LqPesMZo9wURdwkvcFZg
 #+end_src
 
 ***** Glossaries and more
@@ -8424,7 +8454,8 @@ set up org-capture.
 
   (setq doct-after-conversion-functions '(+doct-iconify-capture-templates))
 
-  (defvar +org-capture-recipies  "~/Desktop/TEC/Organisation/recipies.org")
+  ;; (defvar +org-capture-recipies  "~/Desktop/TEC/Organisation/recipies.org")
+  (defvar +org-capture-recipies  "~/org/personal/household/cookbook.org")
 
   (defun set-org-capture-templates ()
     (setq org-capture-templates
@@ -12477,51 +12508,51 @@ Now, there are some symbols that aren't included in =inputenc=, but we should be
 able to handle anyway. For them we define a table of LaTeX translations
 
 #+name: latex-non-ascii-char-substitutions
-| Character | LaTeX |
-|-----------+-------|
-| ɑ         | \(\alpha\) |
-| β         | \(\beta\) |
-| γ         | \(\gamma\) |
-| δ         | \(\delta\) |
-| ε         | \(\epsilon\) |
-| ϵ         | \(\varepsilon\) |
-| ζ         | \(\zeta\) |
-| η         | \(\eta\) |
-| θ         | \(\theta\) |
-| ϑ         | \(\vartheta\) |
-| ι         | \(\iota\) |
-| κ         | \(\kappa\) |
-| λ         | \(\lambda\) |
-| μ         | \(\mu\) |
-| ν         | \(\nu\) |
-| ξ         | \(\xi\) |
-| π         | \(\pi\) |
-| ϖ         | \(\varpi\) |
-| ρ         | \(\rho\) |
+| Character | LaTeX       |
+|-----------+-------------|
+| ɑ         | \(\alpha\)       |
+| β         | \(\beta\)       |
+| γ         | \(\gamma\)       |
+| δ         | \(\delta\)       |
+| ε         | \(\epsilon\)       |
+| ϵ         | \(\varepsilon\)       |
+| ζ         | \(\zeta\)       |
+| η         | \(\eta\)       |
+| θ         | \(\theta\)       |
+| ϑ         | \(\vartheta\)       |
+| ι         | \(\iota\)       |
+| κ         | \(\kappa\)       |
+| λ         | \(\lambda\)       |
+| μ         | \(\mu\)       |
+| ν         | \(\nu\)       |
+| ξ         | \(\xi\)       |
+| π         | \(\pi\)       |
+| ϖ         | \(\varpi\)       |
+| ρ         | \(\rho\)       |
 | ϱ         | \(\varrho\) |
-| σ         | \(\sigma\) |
-| ς         | \(\varsigma\) |
-| τ         | \(\tau\) |
-| υ         | \(\upsilon\) |
-| ϕ         | \(\phi\) |
-| φ         | \(\varphi\) |
-| ψ         | \(\psi\) |
-| ω         | \(\omega\) |
-| Γ         | \(\Gamma\) |
-| Δ         | \(\Delta\) |
-| Θ         | \(\Theta\) |
-| Λ         | \(\Lambda\) |
-| Ξ         | \(\Xi\) |
-| Π         | \(\Pi\) |
-| Σ         | \(\Sigma\) |
-| Υ         | \(\Upsilon\) |
-| Φ         | \(\Phi\) |
-| Ψ         | \(\Psi\) |
-| Ω         | \(\Omega\) |
-| א         | \(\aleph\) |
-| ב         | \(\beth\) |
+| σ         | \(\sigma\)       |
+| ς         | \(\varsigma\)       |
+| τ         | \(\tau\)       |
+| υ         | \(\upsilon\)       |
+| ϕ         | \(\phi\)       |
+| φ         | \(\varphi\)       |
+| ψ         | \(\psi\)       |
+| ω         | \(\omega\)       |
+| Γ         | \(\Gamma\)       |
+| Δ         | \(\Delta\)       |
+| Θ         | \(\Theta\)       |
+| Λ         | \(\Lambda\)       |
+| Ξ         | \(\Xi\)       |
+| Π         | \(\Pi\)       |
+| Σ         | \(\Sigma\)       |
+| Υ         | \(\Upsilon\)       |
+| Φ         | \(\Phi\)       |
+| Ψ         | \(\Psi\)       |
+| Ω         | \(\Omega\)       |
+| א         | \(\aleph\)       |
+| ב         | \(\beth\)       |
 | ד         | \(\daleth\) |
-| ג         | \(\gimel\) |
+| ג         | \(\gimel\)       |
 
 #+name: gen-latex-non-ascii-char-substitutions
 #+begin_src emacs-lisp :noweb-ref none :var latex-non-ascii-char-substitutions=latex-non-ascii-char-substitutions
