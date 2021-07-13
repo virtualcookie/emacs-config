@@ -433,6 +433,12 @@ I'd much rather have my new buffers in ~org-mode~ than ~fundamental-mode~, hence
 #+end_src
 For some reason this + the mixed pitch hook causes issues with hydra and so I'll
 just need to resort to =SPC b o= for now.
+*** Plantuml configuration
+Set the location of the plantuml jar file 
+#+begin_src emacs-lisp
+(setq plantuml-jar-path "~/.emacs.d/.local/etc/plantuml.jar")
+    (setq plantuml-default-exec-mode 'jar)
+#+end_src
 ** Doom configuration
 *** Modules
 :PROPERTIES:
@@ -5036,6 +5042,29 @@ to make that right again, and this package makes that even easier to do.
 #+begin_src emacs-lisp :tangle yes
 (use-package! org-pandoc-import
   :after org)
+  ;; Google Drive integration https://www.emacswiki.org/emacs/GoogleDocs
+;; https://github.com/prasmussen/gdrive
+(defvar gdocs-folder-id "1MGWas-zzpm8ktv2y32gQQRH5FcK9Gyi1"
+     "location for storing org to gdocs exported files, use 'gdrive list  -t <foldername>' to find the id")
+ (defun gdoc-export-buffer ()
+      "Export current buffer as google doc to folder identified by gdocs-folder-id"
+      (interactive)
+      (shell-command
+      (format "gdrive upload --mime text/plain --parent %s --file %s"
+          gdocs-folder-id buffer-file-name)))
+;;  gdrive import --parent '1MGWas-zzpm8ktv2y32gQQRH5FcK9Gyi1' 2021-06-16.txt
+(defun gdoc-import-buffer (doc)
+       "Import a file in gdocs-folder-id into current buffer"
+       (interactive
+       (list
+          (completing-read "Choose one: "
+                     (split-string
+                      (shell-command-to-string
+                       (format "gdrive list -q \"'%s' in parents\"" gdocs-folder-id)) "\n"))))
+       ;;  gdrive list -q "'1MGWas-zzpm8ktv2y32gQQRH5FcK9Gyi1' in parents"
+      (insert (replace-regexp-in-string (string ?\C-m) (string ?\C-j) (shell-command-to-string
+      (format "gdrive download -s --format txt --id %s" (car (split-string doc " ")))))))
+;; gdrive export --mime text/plain  1q-cDyKWyM1uzXrjwf0DJbN4LqPesMZo9wURdwkvcFZg
 #+end_src
 #+end_src
 *** Packages
