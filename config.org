@@ -1794,10 +1794,9 @@ near-minimal new config:
 
 *** Visual Settings
 **** Font Face
-
-'Fira Code' is nice, and 'Overpass' makes for a nice sans companion. We just need to
+'Fira Code' ('Fira Code Retina') is nice, and 'Overpass' ('Alegreya') makes for a nice sans companion. We just need to
 fiddle with the font sizes a tad so that they visually match. Just for fun I'm
-trying out JetBrains Mono though. So far I have mixed feelings on it, some
+trying out 'JetBrains Mono' though. So far I have mixed feelings on it, some
 aspects are nice, but on others I prefer Fira.
 
 #+begin_src emacs-lisp
