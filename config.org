@@ -1361,8 +1361,9 @@ changes Doom makes:
 
 (display-time-mode 1)                             ; Enable time in the mode-line
 
-(unless (string-match-p "^Power N/A" (battery))   ; On laptops...
-  (display-battery-mode 1))                       ; it's nice to know how much power you have
+;;(unless (string-match-p "^Power N/A" (battery))   ; On laptops...
+;;  (display-battery-mode 1))                       ; it's nice to know how much power you have
+(display-battery-mode 1)                          ; Always display as the conditional was erroring out in doom doctor
 
 (global-subword-mode 1)                           ; Iterate through CamelCase words
 #+end_src
@@ -3825,7 +3826,9 @@ nearby (also means that if I change the 'main' dictionary I keep my addition).
 #+begin_src emacs-lisp :tangle yes
 (use-package! org-pandoc-import
   :after org)
-  ;; Google Drive integration https://www.emacswiki.org/emacs/GoogleDocs
+
+;; Google Drive integration for exporting and importing files
+;; Google Drive integration https://www.emacswiki.org/emacs/GoogleDocs
 ;; https://github.com/prasmussen/gdrive
 (defvar gdocs-folder-id "1MGWas-zzpm8ktv2y32gQQRH5FcK9Gyi1"
      "location for storing org to gdocs exported files, use 'gdrive list  -t <foldername>' to find the id")
@@ -7369,7 +7372,6 @@ We can replace the evil binding of =mu4e-compose-goto-bottom= with this function
       :after org-msg
       :n "G" #'+org-msg-goto-body)
 #+end_src
-
 It would also be good to call this when replying to a message. This has to be
 implemented as advice as the compose hooks are run before ~mu4e~compose-handler~
 moves the point with ~message-goto-<location>~.
@@ -7381,6 +7383,26 @@ moves the point with ~message-goto-<location>~.
     (+org-msg-goto-body)))
 
 (advice-add 'mu4e~compose-handler :after #'+org-msg-goto-body-when-replying)
+#+end_src
+
+** Michel2 (Google Tasks)
+
+#+begin_src emacs-lisp
+(defun michel()
+    (interactive)
+    (let ((michel-buf (generate-new-buffer "Emacs Michel")))
+        (switch-to-buffer michel-buf)
+        (insert "=== Emacs Michel ===\n")
+        (let* ((michel-proc (start-process "michel" michel-buf "michel")))
+            (if (string-equal system-type "windows-nt") ;; HACK, use latin-1 or your
+                (set-buffer-process-coding-system 'cp1251 'cp1251)) ;; encoding here
+            (comint-mode)
+            (set-process-sentinel michel-proc
+                `(lambda (p e) (if (eq (current-buffer) ,michel-buf)
+                    (progn
+                    (insert "====================\n")
+                    (sit-for 3)
+                    (kill-buffer))))))))
 #+end_src
 
 * Language configuration
@@ -9272,6 +9294,23 @@ Saving seconds adds up after all! (but only so much)
   "Complete xkcd using `+xkcd-stored-info'"
   (format "xkcd:%d" (+xkcd-select)))
 #+end_src
+***** Music
+First, we set up all the necessarily 'utility' functions.
+Disabled by changing the src language from =emacs-lisp= to =elisp=
+#+begin_src elisp
+(after! org
+  (defvar org-music-player 'mpris
+    "Music player type. Curretly only supports mpris.")
+  (defvar org-music-mpris-player "Lollypop"
+    "Name of the mpris player, used in the form org.gnome.MPRIS.")
+  (defvar org-music-track-search-method 'beets
+    "Method to find the track file from the link.")
+  (defvar org-music-beets-db "~/Music/library.db"
+    "Location of the beets DB, for when using beets as the `org-music-track-search-method'")
+  (defvar org-music-folder "~/Music/"
+    "Location of your music folder, for when using file as the `org-music-track-search-method'")
+  (defvar org-music-recognised-extensions '("flac" "mp4" "m4a" "aiff" "wav" "ogg" "aiff")
+    "When searching for files in `org-music-track-search-method', recognise these extensions as audio files.")
 
 ***** YouTube
 
