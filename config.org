@@ -1361,8 +1361,9 @@ changes Doom makes:
 
 (display-time-mode 1)                             ; Enable time in the mode-line
 
-(unless (string-match-p "^Power N/A" (battery))   ; On laptops...
-  (display-battery-mode 1))                       ; it's nice to know how much power you have
+;;(unless (string-match-p "^Power N/A" (battery))   ; On laptops...
+;;  (display-battery-mode 1))                       ; it's nice to know how much power you have
+(display-battery-mode 1)                          ; Always display as the conditional was erroring out in doom doctor
 
 (global-subword-mode 1)                           ; Iterate through CamelCase words
 #+end_src
@@ -9266,7 +9267,8 @@ Saving seconds adds up after all! (but only so much)
 
 ***** Music
 First, we set up all the necessarily 'utility' functions.
-#+begin_src emacs-lisp
+Disabled by changing the src language from =emacs-lisp= to =elisp=
+#+begin_src elisp
 (after! org
   (defvar org-music-player 'mpris
     "Music player type. Curretly only supports mpris.")
