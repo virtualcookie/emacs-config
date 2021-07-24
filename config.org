@@ -311,6 +311,14 @@ for more info).
 #+begin_src shell :exports none :comments no :tangle-mode (identity #o755)
 #!/bin/bash
 #+end_src
+
+This is to set the bash environment variables so the emacs binary is found when
+tangling this file.
+#+begin_src emacs-lisp
+;; (setenv "PATH" (concat (getenv "PATH") ":" (expand-file-name "~/.cargo/bin")))
+;; (setq exec-path (append exec-path (list (expand-file-name "~/.cargo/bin"))))
+;; (setenv "BASH_ENV" "~/.bashrc")
+#+end_src
 ** Personal Information
 It's useful to have some basic personal information
 #+begin_src emacs-lisp
@@ -350,8 +358,9 @@ the following:
 
 (display-time-mode 1)                             ; Enable time in the mode-line
 
-(unless (string-match-p "^Power N/A" (battery))   ; On laptops...
-  (display-battery-mode 1))                       ; it's nice to know how much power you have
+;;(unless (string-match-p "^Power N/A" (battery))   ; On laptops...
+;;  (display-battery-mode 1))                       ; it's nice to know how much power you have
+(display-battery-mode 1)                          ; Always display as the conditional was erroring out in doom doctor
 
 (global-subword-mode 1)                           ; Iterate through CamelCase words
 #+end_src
@@ -581,7 +590,7 @@ grammar                      ; tasing grammar mistake every you make
 
 #+name: doom-tools
 #+begin_src emacs-lisp
-ansible                      ; a crucible for infrastructure as code
+;;ansible                      ; a crucible for infrastructure as code
 ;;debugger                   ; FIXME stepping through code, to help you add bugs
 ;;direnv                     ; be direct about your environment
 docker                       ; port everything to containers
@@ -721,7 +730,7 @@ aspects are nice, but on others I prefer Fira.
 #+begin_src emacs-lisp
 (setq doom-font (font-spec :family "Fira Code Retina" :size 12)
       doom-big-font (font-spec :family "Fira Code Retina" :size 36)
-      doom-variable-pitch-font (font-spec :family "Overpass" :size 18)
+      doom-variable-pitch-font (font-spec :family "Overpass" :size 14)
       doom-unicode-font (font-spec :family "JuliaMono")
       doom-serif-font (font-spec :family "IBM Plex Mono" :weight 'light))
 #+end_src
@@ -4516,6 +4525,26 @@ minor tweaks.
       :after org-msg
       :n "G" #'org-msg-goto-body)
 #+end_src
+** Michel2 (Google Tasks)
+
+#+begin_src emacs-lisp
+(defun michel()
+    (interactive)
+    (let ((michel-buf (generate-new-buffer "Emacs Michel")))
+        (switch-to-buffer michel-buf)
+        (insert "=== Emacs Michel ===\n")
+        (let* ((michel-proc (start-process "michel" michel-buf "michel")))
+            (if (string-equal system-type "windows-nt") ;; HACK, use latin-1 or your
+                (set-buffer-process-coding-system 'cp1251 'cp1251)) ;; encoding here
+            (comint-mode)
+            (set-process-sentinel michel-proc
+                `(lambda (p e) (if (eq (current-buffer) ,michel-buf)
+                    (progn
+                    (insert "====================\n")
+                    (sit-for 3)
+                    (kill-buffer))))))))
+#+end_src
+
 * Language configuration
 ** General
 *** File Templates
@@ -6198,7 +6227,8 @@ Saving seconds adds up after all! (but only so much)
 
 ***** Music
 First, we set up all the necessarily 'utility' functions.
-#+begin_src emacs-lisp
+Disabled by changing the src language from =emacs-lisp= to =elisp=
+#+begin_src elisp
 (after! org
   (defvar org-music-player 'mpris
     "Music player type. Curretly only supports mpris.")
@@ -6389,7 +6419,8 @@ This action is reversed by `org-music-time-to-seconds'."
 #+end_src
 
 Then we integrate this nicely with org-mode
-#+begin_src emacs-lisp
+Disabled by changing the src language from =emacs-lisp= to =elisp=
+#+begin_src elisp
 (after! org
   (org-link-set-parameters "music"
                            :follow #'org-music-open-fn
