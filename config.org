@@ -1644,7 +1644,6 @@ add package src directories to projectile. This isn't desirable in my opinion.
   "Return t if FILEPATH is within any of `projectile-ignored-projects'"
   (or (mapcar (lambda (p) (s-starts-with-p p filepath)) projectile-ignored-projects)))
 #+end_src
-
 *** Ispell
 **** Downloading dictionaries
 Let's get a nice big dictionary from [[http://app.aspell.net/create][SCOWL Custom List/Dictionary Creator]] with
@@ -4960,7 +4959,6 @@ to make that right again, and this package makes that even easier to do.
       (format "gdrive download -s --format txt --id %s" (car (split-string doc " ")))))))
 ;; gdrive export --mime text/plain  1q-cDyKWyM1uzXrjwf0DJbN4LqPesMZo9wURdwkvcFZg
 #+end_src
-
 *** Behaviour
 [[xkcd:1319]]
 **** Tweaking defaults
