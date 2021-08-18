@@ -1319,8 +1319,8 @@ the start of the tangle process. This is done by calling =bootstrap= within the
 
 It's useful to have some basic personal information
 #+begin_src emacs-lisp
-(setq user-full-name "Himanshu Singh"
-      user-mail-address "to.himanshu.singh@gmail.com")
+(setq user-full-name "TEC"
+      user-mail-address "tec@tecosaur.com")
 #+end_src
 Apparently this is used by ~GPG~, and all sorts of other things.
 
@@ -1361,9 +1361,8 @@ changes Doom makes:
 
 (display-time-mode 1)                             ; Enable time in the mode-line
 
-;;(unless (string-match-p "^Power N/A" (battery))   ; On laptops...
-;;  (display-battery-mode 1))                       ; it's nice to know how much power you have
-(display-battery-mode 1)                          ; Always display as the conditional was erroring out in doom doctor
+(unless (string-match-p "^Power N/A" (battery))   ; On laptops...
+  (display-battery-mode 1))                       ; it's nice to know how much power you have
 
 (global-subword-mode 1)                           ; Iterate through CamelCase words
 #+end_src
@@ -1581,7 +1580,7 @@ multiple-cursors             ; editing in many places at once
 ;;parinfer                   ; turn lisp into python, sort of
 rotate-text                  ; cycle region at point between text candidates
 snippets                     ; my elves. They type so I don't have to
-word-wrap                  ; soft wrapping with language-aware indent
+;;word-wrap                  ; soft wrapping with language-aware indent
 #+end_src
 
 #+name: doom-emacs
@@ -1615,7 +1614,7 @@ biblio                       ; Writes a PhD for you (citation needed)
 ;;debugger                   ; FIXME stepping through code, to help you add bugs
 ;;direnv                     ; be direct about your environment
 docker                       ; port everything to containers
-editorconfig               ; let someone else argue about tabs vs spaces
+;;editorconfig               ; let someone else argue about tabs vs spaces
 ;;ein                        ; tame Jupyter notebooks with emacs
 (eval +overlay)              ; run code, run (also, repls)
 ;;gist                       ; interacting with github gists
@@ -1640,7 +1639,6 @@ upload                       ; map local to remote projects via ssh/ftp
 
 #+name: doom-os
 #+begin_src emacs-lisp
-(:if IS-MAC macos)           ; improve compatibility with macOS
 tty                          ; improve the terminal Emacs experience
 #+end_src
 
@@ -1705,7 +1703,7 @@ nix                          ; I hereby declare "nix geht mehr!"
  +present                    ; using org-mode for presentations
  +roam2)                     ; wander around notes
 ;;php                        ; perl's insecure younger brother
-plantuml                     ; diagrams for confusing people more
+;;plantuml                   ; diagrams for confusing people more
 ;;purescript                 ; javascript, but functional
 (python +lsp +pyright)       ; beautiful is better than ugly
 ;;qt                         ; the 'cutest' gui framework ever
@@ -1720,7 +1718,7 @@ scheme                       ; a fully conniving family of lisps
 sh                           ; she sells {ba,z,fi}sh shells on the C xor
 ;;sml                        ; no, the /other/ ML
 ;;solidity                   ; do you need a blockchain? No.
-swift                      ; who asked for emoji variables?
+;;swift                      ; who asked for emoji variables?
 ;;terra                      ; Earth and Moon in alignment for performance.
 web                          ; the tubes
 yaml                         ; JSON, but readable
@@ -1751,7 +1749,7 @@ I couldn't resist the Email and Feed modules.
 
 #+name: doom-app
 #+begin_src emacs-lisp
-calendar                   ; A dated approach to timetabling
+;;calendar                   ; A dated approach to timetabling
 ;;emms                       ; Multimedia in Emacs is music to my ears
 everywhere                   ; *leave* Emacs!? You must be joking.
 irc                          ; how neckbeards socialize
@@ -1795,9 +1793,9 @@ near-minimal new config:
 
 *** Visual Settings
 **** Font Face
-'Fira Code' ('Fira Code Retina') is nice, and 'Overpass' ('Alegreya') makes for a nice sans companion. We just need to
+'Fira Code' is nice, and 'Overpass' makes for a nice sans companion. We just need to
 fiddle with the font sizes a tad so that they visually match. Just for fun I'm
-trying out 'JetBrains Mono' though. So far I have mixed feelings on it, some
+trying out JetBrains Mono though. So far I have mixed feelings on it, some
 aspects are nice, but on others I prefer Fira.
 
 #+begin_src emacs-lisp
@@ -3477,6 +3475,8 @@ already clear, and there's no need for a different face.
   (set-face-attribute 'consult-file nil :inherit 'consult-buffer)
   (setf (plist-get (alist-get 'perl consult-async-split-styles-alist) :initial) ";"))
 #+end_src
+Unfortunately this seems to mess things up, which is something I'll want to look
+into later.
 
 *** Magit
 
@@ -3659,6 +3659,10 @@ Now we can make use of the package for this.
 #+begin_src emacs-lisp :tangle packages.el :noweb-ref none
 ;; (package! magit-delta :recipe (:host github :repo "dandavison/magit-delta") :pin "5fc7dbddcfacfe46d3fd876172ad02a9ab6ac616")
 #+end_src
+*** Projectile
+#+begin_quote
+From the =:core packages= module.
+#+end_quote
 
 All that's left is to hook it into magit
 #+begin_src emacs-lisp :noweb-ref none
@@ -3802,6 +3806,7 @@ tar -xjf "aspell6-en-custom.tar.bz2"
 cd aspell6-en-custom
 ./configure && make && sudo make install
 #+end_src
+*** Auto activating snippets
 
 **** Configuration
 
@@ -3823,34 +3828,12 @@ nearby (also means that if I change the 'main' dictionary I keep my addition).
 (setq ispell-personal-dictionary
       (expand-file-name "misc/ispell_personal" doom-private-dir))
 #+end_src
-#+begin_src emacs-lisp :tangle yes
-(use-package! org-pandoc-import
-  :after org)
 
-;; Google Drive integration for exporting and importing files
-;; Google Drive integration https://www.emacswiki.org/emacs/GoogleDocs
-;; https://github.com/prasmussen/gdrive
-(defvar gdocs-folder-id "1MGWas-zzpm8ktv2y32gQQRH5FcK9Gyi1"
-     "location for storing org to gdocs exported files, use 'gdrive list  -t <foldername>' to find the id")
- (defun gdoc-export-buffer ()
-      "Export current buffer as google doc to folder identified by gdocs-folder-id"
-      (interactive)
-      (shell-command
-      (format "gdrive upload --mime text/plain --parent %s --file %s"
-          gdocs-folder-id buffer-file-name)))
-;;  gdrive import --parent '1MGWas-zzpm8ktv2y32gQQRH5FcK9Gyi1' 2021-06-16.txt
-(defun gdoc-import-buffer (doc)
-       "Import a file in gdocs-folder-id into current buffer"
-       (interactive
-       (list
-          (completing-read "Choose one: "
-                     (split-string
-                      (shell-command-to-string
-                       (format "gdrive list -q \"'%s' in parents\"" gdocs-folder-id)) "\n"))))
-       ;;  gdrive list -q "'1MGWas-zzpm8ktv2y32gQQRH5FcK9Gyi1' in parents"
-      (insert (replace-regexp-in-string (string ?\C-m) (string ?\C-j) (shell-command-to-string
-      (format "gdrive download -s --format txt --id %s" (car (split-string doc " ")))))))
-;; gdrive export --mime text/plain  1q-cDyKWyM1uzXrjwf0DJbN4LqPesMZo9wURdwkvcFZg
+*** Screenshot
+
+This makes it a breeze to take lovely screenshots.
+#+begin_src emacs-lisp :tangle packages.el
+(package! screenshot :recipe (:local-repo "lisp/screenshot"))
 #+end_src
 
 *** TRAMP
@@ -4128,6 +4111,7 @@ for this, so I made one.
 #+begin_src emacs-lisp :tangle packages.el
 (package! simple-comment-markup :recipe (:local-repo "lisp/simple-comment-markup"))
 #+end_src
+*** Keycast
 
 Let's use both basic Org markup and Markdown code backticks, to cover most
 situations decently.
@@ -4148,20 +4132,14 @@ From the =:ui emoji= module.
 #+end_quote
 
 
-For starters, twitter's emojis look nicer than emoji-one.
-Other than that, this is pretty great OOTB 😀.
+#+attr_html: :class invertible :alt Screenshot of Keycast-mode in action
+[[https://tecosaur.com/lfs/emacs-config/screenshots/keycast.png]]
 
-#+begin_src emacs-lisp
-(setq emojify-emoji-set "twemoji-v2")
+#+begin_src emacs-lisp :tangle packages.el
+(package! keycast :pin "04ba7519f34421c235bac458f0192c130f732f12")
 #+end_src
 
-One minor annoyance is the use of emojis over the default character
-when the default is actually preferred. This occurs with overlay symbols I use
-in Org mode, such as checkbox state, and a few other miscellaneous cases.
-
-We can accommodate our preferences by deleting those entries from the emoji hash
-table
-
+Let's just make sure this is lazy-loaded appropriately.
 #+begin_src emacs-lisp
 (defvar emojify-disabled-emojis
   '(;; Org
@@ -4557,6 +4535,10 @@ Thankfully, it isn't to hard to add these to the ~composition-function-table~.
 (set-char-table-range composition-function-table ?f '(["\\(?:ff?[fijlt]\\)" 0 font-shape-gstring]))
 (set-char-table-range composition-function-table ?T '(["\\(?:Th\\)" 0 font-shape-gstring]))
 #+end_src
+*** Marginalia
+#+begin_quote
+Part of the =:completion vertico= module.
+#+end_quote
 
 **** Variable pitch serif font
 
@@ -4659,6 +4641,15 @@ inside the src_elisp{(after! ... )} block ¯\_(ツ)_/¯.
 Then let's change the font to a sans serif, but the default one doesn't fit too
 well somehow, so let's switch to 'P22 Underground Book'; it looks much nicer.
 
+We want to make the tabs a nice, comfy size (~36~), with icons. The modifier
+marker is nice, but the particular default Unicode one causes a lag spike, so
+let's just switch to an ~o~, which still looks decent but doesn't cause any
+issues.
+A 'active-bar' is nice, so let's have one of those. If we have it ~under~ needs us to
+turn on ~x-underline-at-decent~ though. For some reason this didn't seem to work
+inside the src_elisp{(after! ... )} block ¯\_(ツ)_/¯.
+Then let's change the font to a sans serif, but the default one doesn't fit too
+well somehow, so let's switch to 'P22 Underground Book'; it looks much nicer.
 #+begin_src emacs-lisp
 (after! centaur-tabs
   (centaur-tabs-mode -1)
@@ -4819,37 +4810,16 @@ good reason for them to take up space. Let's add a mechanism to ignore them.
   (add-to-list 'treemacs-ignored-file-predicates #'treemacs-ignore-filter))
 #+end_src
 
-Now, we just identify the files in question.
 #+begin_src emacs-lisp
-(setq treemacs-file-ignore-extensions
-      '(;; LaTeX
-        "aux"
-        "ptc"
-        "fdb_latexmk"
-        "fls"
-        "synctex.gz"
-        "toc"
-        ;; LaTeX - glossary
-        "glg"
-        "glo"
-        "gls"
-        "glsdefs"
-        "ist"
-        "acn"
-        "acr"
-        "alg"
-        ;; LaTeX - pgfplots
-        "mw"
-        ;; LaTeX - pdfx
-        "pdfa.xmpi"
-        ))
-(setq treemacs-file-ignore-globs
-      '(;; LaTeX
-        "*/_minted-*"
-        ;; AucTeX
-        "*/.auctex-auto"
-        "*/_region_.log"
-        "*/_region_.tex"))
+(use-package! page-break-lines
+  :commands page-break-lines-mode
+  :init
+  (autoload 'turn-on-page-break-lines-mode "page-break-lines")
+  :config
+  (setq page-break-lines-max-width fill-column)
+  (map! :prefix "g"
+        :desc "Prev page break" :nv "[" #'backward-page
+        :desc "Next page break" :nv "]" #'forward-page))
 #+end_src
 
 ** Frivolities
@@ -8453,8 +8423,7 @@ set up org-capture.
 
   (setq doct-after-conversion-functions '(+doct-iconify-capture-templates))
 
-  ;; (defvar +org-capture-recipies  "~/Desktop/TEC/Organisation/recipies.org")
-  (defvar +org-capture-recipies  "~/org/personal/household/cookbook.org")
+  (defvar +org-capture-recipies  "~/Desktop/TEC/Organisation/recipies.org")
 
   (defun set-org-capture-templates ()
     (setq org-capture-templates
@@ -8481,7 +8450,7 @@ set up org-capture.
                    :headline "Inbox"
                    :type entry
                    :template ("* TODO %^{type|reply to|contact} %\\3 %? :email:"
-                              "Send an email %^{urgency|soon|ASAP|anon|at some point|eventually} to %^{recipient}"
+                              "Send an email %^{urgancy|soon|ASAP|anon|at some point|eventually} to %^{recipiant}"
                               "about %^{topic}"
                               "%U %i %a"))
                   ("Interesting" :keys "i"
@@ -8499,7 +8468,7 @@ set up org-capture.
                               ("Article" :keys "a"
                                :icon ("file-text" :set "octicon" :color "yellow")
                                :desc ""
-                               :i-type "read:research"
+                               :i-type "read:reaserch"
                                )
                               ("\tRecipie" :keys "r"
                                :icon ("spoon" :set "faicon" :color "dorange")
@@ -9294,10 +9263,10 @@ Saving seconds adds up after all! (but only so much)
   "Complete xkcd using `+xkcd-stored-info'"
   (format "xkcd:%d" (+xkcd-select)))
 #+end_src
+
 ***** Music
 First, we set up all the necessarily 'utility' functions.
-Disabled by changing the src language from =emacs-lisp= to =elisp=
-#+begin_src elisp
+#+begin_src emacs-lisp
 (after! org
   (defvar org-music-player 'mpris
     "Music player type. Curretly only supports mpris.")
@@ -9644,31 +9613,18 @@ Must be run as part of `org-font-lock-set-keywords-hook'."
 (add-hook 'org-font-lock-set-keywords-hook #'org-fontify-inline-src-blocks-enable)
 #+end_src
 
+Doom theme's extra fontification is more problematic than helpful.
+#+begin_src emacs-lisp
+(setq doom-themes-org-fontify-special-tags nil)
+#+end_src
+
 **** Symbols
+
 It's also nice to change the character used for collapsed items (by default ~…~),
 I think ~▾~ is better for indicating 'collapsed section'.
 and add an extra ~org-bullet~ to the default list of four.
 I've also added some fun alternatives, just commented out.
 #+begin_src emacs-lisp
-;; (use-package org-pretty-tags
-;; :config
-;;  (setq org-pretty-tags-surrogate-strings
-;;        `(("uni"        . ,(all-the-icons-faicon   "graduation-cap" :face 'all-the-icons-purple  :v-adjust 0.01))
-;;          ("ucc"        . ,(all-the-icons-material "computer"       :face 'all-the-icons-silver  :v-adjust 0.01))
-;;          ("assignment" . ,(all-the-icons-material "library_books"  :face 'all-the-icons-orange  :v-adjust 0.01))
-;;          ("test"       . ,(all-the-icons-material "timer"          :face 'all-the-icons-red     :v-adjust 0.01))
-;;          ("lecture"    . ,(all-the-icons-fileicon "keynote"        :face 'all-the-icons-orange  :v-adjust 0.01))
-;;          ("email"      . ,(all-the-icons-faicon   "envelope"       :face 'all-the-icons-blue    :v-adjust 0.01))
-;;          ("read"       . ,(all-the-icons-octicon  "book"           :face 'all-the-icons-lblue   :v-adjust 0.01))
-;;          ("article"    . ,(all-the-icons-octicon  "file-text"      :face 'all-the-icons-yellow  :v-adjust 0.01))
-;;          ("web"        . ,(all-the-icons-faicon   "globe"          :face 'all-the-icons-green   :v-adjust 0.01))
-;;          ("info"       . ,(all-the-icons-faicon   "info-circle"    :face 'all-the-icons-blue    :v-adjust 0.01))
-;;          ("issue"      . ,(all-the-icons-faicon   "bug"            :face 'all-the-icons-red     :v-adjust 0.01))
-;;          ("someday"    . ,(all-the-icons-faicon   "calendar-o"     :face 'all-the-icons-cyan    :v-adjust 0.01))
-;;          ("idea"       . ,(all-the-icons-octicon  "light-bulb"     :face 'all-the-icons-yellow  :v-adjust 0.01))
-;;          ("emacs"      . ,(all-the-icons-fileicon "emacs"          :face 'all-the-icons-lpurple :v-adjust 0.01))))
-;;  (org-pretty-tags-global-mode))
-
 (after! org-superstar
   (setq org-superstar-headline-bullets-list '("◉" "○" "✸" "✿" "✤" "✜" "◆" "▶")
         org-superstar-prettify-item-bullets t ))
@@ -9768,6 +9724,32 @@ It's also nice to make use of the Unicode characters for check boxes, and other 
   :priority_d    "[#D]"
   :priority_e    "[#E]")
 (plist-put +ligatures-extra-symbols :name "⁍")
+#+end_src
+
+~org-superstar-mode~ is great. While we're at it we may as well make tags prettier as well 🙂
+#+begin_src emacs-lisp :tangle packages.el
+;; (package! org-pretty-tags :pin "5c7521651b35ae9a7d3add4a66ae8cc176ae1c76")
+#+end_src
+
+#+begin_src emacs-lisp
+;; (use-package org-pretty-tags
+;; :config
+;;  (setq org-pretty-tags-surrogate-strings
+;;        `(("uni"        . ,(all-the-icons-faicon   "graduation-cap" :face 'all-the-icons-purple  :v-adjust 0.01))
+;;          ("ucc"        . ,(all-the-icons-material "computer"       :face 'all-the-icons-silver  :v-adjust 0.01))
+;;          ("assignment" . ,(all-the-icons-material "library_books"  :face 'all-the-icons-orange  :v-adjust 0.01))
+;;          ("test"       . ,(all-the-icons-material "timer"          :face 'all-the-icons-red     :v-adjust 0.01))
+;;          ("lecture"    . ,(all-the-icons-fileicon "keynote"        :face 'all-the-icons-orange  :v-adjust 0.01))
+;;          ("email"      . ,(all-the-icons-faicon   "envelope"       :face 'all-the-icons-blue    :v-adjust 0.01))
+;;          ("read"       . ,(all-the-icons-octicon  "book"           :face 'all-the-icons-lblue   :v-adjust 0.01))
+;;          ("article"    . ,(all-the-icons-octicon  "file-text"      :face 'all-the-icons-yellow  :v-adjust 0.01))
+;;          ("web"        . ,(all-the-icons-faicon   "globe"          :face 'all-the-icons-green   :v-adjust 0.01))
+;;          ("info"       . ,(all-the-icons-faicon   "info-circle"    :face 'all-the-icons-blue    :v-adjust 0.01))
+;;          ("issue"      . ,(all-the-icons-faicon   "bug"            :face 'all-the-icons-red     :v-adjust 0.01))
+;;          ("someday"    . ,(all-the-icons-faicon   "calendar-o"     :face 'all-the-icons-cyan    :v-adjust 0.01))
+;;          ("idea"       . ,(all-the-icons-octicon  "light-bulb"     :face 'all-the-icons-yellow  :v-adjust 0.01))
+;;          ("emacs"      . ,(all-the-icons-fileicon "emacs"          :face 'all-the-icons-lpurple :v-adjust 0.01))))
+;;  (org-pretty-tags-global-mode))
 #+end_src
 
 **** LaTeX Fragments
@@ -11864,10 +11846,137 @@ exporting that as LaTeX commands.
   :after ox-latex)
 #+end_src
 
-Using this as in LaTeX exports is now as easy as
+Thanks to ~org-latex-conditional-features~ and some copy-paste with the =minted=
+entry in ~org-latex-scr-block~ we can easily add this as a recognised
+~org-latex-listings~ value.
 
-#+begin_src emacs-lisp
-(setq org-latex-listings 'engraved)
+#+begin_src emacs-lisp :noweb no-export
+(defadvice! org-latex-src-block-engraved (orig-fn src-block contents info)
+  "Like `org-latex-src-block', but supporting an engraved backend"
+  :around #'org-latex-src-block
+  (if (eq 'engraved (plist-get info :latex-listings))
+      (org-latex-scr-block--engraved src-block contents info)
+    (funcall orig-fn src-block contents info)))
+
+(defadvice! org-latex-inline-src-block-engraved (orig-fn inline-src-block contents info)
+  "Like `org-latex-inline-src-block', but supporting an engraved backend"
+  :around #'org-latex-inline-src-block
+  (if (eq 'engraved (plist-get info :latex-listings))
+      (org-latex-inline-scr-block--engraved inline-src-block contents info)
+    (funcall orig-fn src-block contents info)))
+
+(defvar-local org-export-has-code-p nil)
+
+(defadvice! org-export-expect-no-code (&rest _)
+  :before #'org-export-as
+  (setq org-export-has-code-p nil))
+
+(defadvice! org-export-register-code (&rest _)
+  :after #'org-latex-src-block-engraved
+  :after #'org-latex-inline-src-block-engraved
+  (setq org-export-has-code-p t))
+
+(setq org-latex-engraved-code-preamble "
+<<org-latex-engraved-code-preamble>>
+")
+
+(add-to-list 'org-latex-conditional-features '((and org-export-has-code-p "^[ \t]*#\\+begin_src\\|^[ \t]*#\\+BEGIN_SRC\\|src_[A-Za-z]") . engraved-code) t)
+(add-to-list 'org-latex-conditional-features '("^[ \t]*#\\+begin_example\\|^[ \t]*#\\+BEGIN_EXAMPLE" . engraved-code-setup) t)
+(add-to-list 'org-latex-feature-implementations '(engraved-code :requires engraved-code-setup :snippet (engrave-faces-latex-gen-preamble) :order 99) t)
+(add-to-list 'org-latex-feature-implementations '(engraved-code-setup :snippet org-latex-engraved-code-preamble :order 98) t)
+
+(defun org-latex-scr-block--engraved (src-block contents info)
+  (let* ((lang (org-element-property :language src-block))
+         (attributes (org-export-read-attribute :attr_latex src-block))
+         (float (plist-get attributes :float))
+         (num-start (org-export-get-loc src-block info))
+         (retain-labels (org-element-property :retain-labels src-block))
+         (caption (org-element-property :caption src-block))
+         (caption-above-p (org-latex--caption-above-p src-block info))
+         (caption-str (org-latex--caption/label-string src-block info))
+         (placement (or (org-unbracket-string "[" "]" (plist-get attributes :placement))
+                        (plist-get info :latex-default-figure-position)))
+         (float-env
+          (cond
+           ((string= "multicolumn" float)
+            (format "\\begin{listing*}[%s]\n%s%%s\n%s\\end{listing*}"
+                    placement
+                    (if caption-above-p caption-str "")
+                    (if caption-above-p "" caption-str)))
+           (caption
+            (format "\\begin{listing}[%s]\n%s%%s\n%s\\end{listing}"
+                    placement
+                    (if caption-above-p caption-str "")
+                    (if caption-above-p "" caption-str)))
+           ((string= "t" float)
+            (concat (format "\\begin{listing}[%s]\n"
+                            placement)
+                    "%s\n\\end{listing}"))
+           (t "%s")))
+         (options (plist-get info :latex-minted-options))
+         (content-buffer
+          (with-temp-buffer
+            (insert
+             (let* ((code-info (org-export-unravel-code src-block))
+                    (max-width
+                     (apply 'max
+                            (mapcar 'length
+                                    (org-split-string (car code-info)
+                                                      "\n")))))
+               (org-export-format-code
+                (car code-info)
+                (lambda (loc _num ref)
+                  (concat
+                   loc
+                   (when ref
+                     ;; Ensure references are flushed to the right,
+                     ;; separated with 6 spaces from the widest line
+                     ;; of code.
+                     (concat (make-string (+ (- max-width (length loc)) 6)
+                                          ?\s)
+                             (format "(%s)" ref)))))
+                nil (and retain-labels (cdr code-info)))))
+            (funcall (org-src-get-lang-mode lang))
+            (engrave-faces-latex-buffer)))
+         (content
+          (with-current-buffer content-buffer
+            (buffer-string)))
+         (body
+          (format
+           "\\begin{Code}\n\\begin{Verbatim}[%s]\n%s\\end{Verbatim}\n\\end{Code}"
+           ;; Options.
+           (concat
+            (org-latex--make-option-string
+             (if (or (not num-start) (assoc "linenos" options))
+                 options
+               (append
+                `(("linenos")
+                  ("firstnumber" ,(number-to-string (1+ num-start))))
+                options)))
+            (let ((local-options (plist-get attributes :options)))
+              (and local-options (concat "," local-options))))
+           content)))
+    (kill-buffer content-buffer)
+    ;; Return value.
+    (format float-env body)))
+
+(defun org-latex-inline-scr-block--engraved (inline-src-block _contents info)
+  (let ((options (org-latex--make-option-string
+                  (plist-get info :latex-minted-options)))
+        code-buffer code)
+    (setq code-buffer
+          (with-temp-buffer
+            (insert (org-element-property :value inline-src-block))
+            (funcall (org-src-get-lang-mode
+                      (org-element-property :language inline-src-block)))
+            (engrave-faces-latex-buffer)))
+    (setq code (with-current-buffer code-buffer
+                 (buffer-string)))
+    (kill-buffer code-buffer)
+    (format "\\Verb%s{%s}"
+            (if (string= options "") ""
+              (format "[%s]" options))
+            code)))
 #+end_src
 
 One little annoyance with this is the interaction between microtype and =Verbatim=
@@ -12362,51 +12471,51 @@ Now, there are some symbols that aren't included in =inputenc=, but we should be
 able to handle anyway. For them we define a table of LaTeX translations
 
 #+name: latex-non-ascii-char-substitutions
-| Character | LaTeX       |
-|-----------+-------------|
-| ɑ         | \(\alpha\)       |
-| β         | \(\beta\)       |
-| γ         | \(\gamma\)       |
-| δ         | \(\delta\)       |
-| ε         | \(\epsilon\)       |
-| ϵ         | \(\varepsilon\)       |
-| ζ         | \(\zeta\)       |
-| η         | \(\eta\)       |
-| θ         | \(\theta\)       |
-| ϑ         | \(\vartheta\)       |
-| ι         | \(\iota\)       |
-| κ         | \(\kappa\)       |
-| λ         | \(\lambda\)       |
-| μ         | \(\mu\)       |
-| ν         | \(\nu\)       |
-| ξ         | \(\xi\)       |
-| π         | \(\pi\)       |
-| ϖ         | \(\varpi\)       |
-| ρ         | \(\rho\)       |
+| Character | LaTeX |
+|-----------+-------|
+| ɑ         | \(\alpha\) |
+| β         | \(\beta\) |
+| γ         | \(\gamma\) |
+| δ         | \(\delta\) |
+| ε         | \(\epsilon\) |
+| ϵ         | \(\varepsilon\) |
+| ζ         | \(\zeta\) |
+| η         | \(\eta\) |
+| θ         | \(\theta\) |
+| ϑ         | \(\vartheta\) |
+| ι         | \(\iota\) |
+| κ         | \(\kappa\) |
+| λ         | \(\lambda\) |
+| μ         | \(\mu\) |
+| ν         | \(\nu\) |
+| ξ         | \(\xi\) |
+| π         | \(\pi\) |
+| ϖ         | \(\varpi\) |
+| ρ         | \(\rho\) |
 | ϱ         | \(\varrho\) |
-| σ         | \(\sigma\)       |
-| ς         | \(\varsigma\)       |
-| τ         | \(\tau\)       |
-| υ         | \(\upsilon\)       |
-| ϕ         | \(\phi\)       |
-| φ         | \(\varphi\)       |
-| ψ         | \(\psi\)       |
-| ω         | \(\omega\)       |
-| Γ         | \(\Gamma\)       |
-| Δ         | \(\Delta\)       |
-| Θ         | \(\Theta\)       |
-| Λ         | \(\Lambda\)       |
-| Ξ         | \(\Xi\)       |
-| Π         | \(\Pi\)       |
-| Σ         | \(\Sigma\)       |
-| Υ         | \(\Upsilon\)       |
-| Φ         | \(\Phi\)       |
-| Ψ         | \(\Psi\)       |
-| Ω         | \(\Omega\)       |
-| א         | \(\aleph\)       |
-| ב         | \(\beth\)       |
+| σ         | \(\sigma\) |
+| ς         | \(\varsigma\) |
+| τ         | \(\tau\) |
+| υ         | \(\upsilon\) |
+| ϕ         | \(\phi\) |
+| φ         | \(\varphi\) |
+| ψ         | \(\psi\) |
+| ω         | \(\omega\) |
+| Γ         | \(\Gamma\) |
+| Δ         | \(\Delta\) |
+| Θ         | \(\Theta\) |
+| Λ         | \(\Lambda\) |
+| Ξ         | \(\Xi\) |
+| Π         | \(\Pi\) |
+| Σ         | \(\Sigma\) |
+| Υ         | \(\Upsilon\) |
+| Φ         | \(\Phi\) |
+| Ψ         | \(\Psi\) |
+| Ω         | \(\Omega\) |
+| א         | \(\aleph\) |
+| ב         | \(\beth\) |
 | ד         | \(\daleth\) |
-| ג         | \(\gimel\)       |
+| ג         | \(\gimel\) |
 
 #+name: gen-latex-non-ascii-char-substitutions
 #+begin_src emacs-lisp :noweb-ref none :var latex-non-ascii-char-substitutions=latex-non-ascii-char-substitutions
@@ -13569,11 +13678,4 @@ Of course, there's an Emacs mode for this.
   (map! :map beancount-mode-map
         :n "TAB" #'beancount-align-to-previous-number
         :i "RET" (cmd! (newline-and-indent) (beancount-align-to-previous-number))))
-#+end_src
-
-** Plantuml
-Set the location of the plantuml jar file
-#+begin_src emacs-lisp
-(setq plantuml-jar-path "~/.emacs.d/.local/etc/plantuml.jar")
-    (setq plantuml-default-exec-mode 'jar)
 #+end_src
