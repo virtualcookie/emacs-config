@@ -1644,7 +1644,7 @@ add package src directories to projectile. This isn't desirable in my opinion.
 cd /tmp
 curl -o "aspell6-en-custom.tar.bz2" 'http://app.aspell.net/create?max_size=80&spelling=GBs&spelling=AU&max_variant=0&diacritic=keep&special=hacker&special=roman-numerals&encoding=utf-8&format=inline&download=aspell'
 tar -xjf "aspell6-en-custom.tar.bz2"
-
+#+end_src
 *** Ispell
 **** Downloading dictionaries
 Let's get a nice big dictionary from [[http://app.aspell.net/create][SCOWL Custom List/Dictionary Creator]] with
@@ -4935,7 +4935,6 @@ to make that right again, and this package makes that even easier to do.
 #+begin_src emacs-lisp :tangle yes
 (use-package! org-pandoc-import
   :after org)
-#+end_src
 #+end_src
 *** Behaviour
 [[xkcd:1319]]
