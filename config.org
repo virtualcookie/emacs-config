@@ -3775,7 +3775,6 @@ add package src directories to projectile. This isn't desirable in my opinion.
   "Return t if FILEPATH is within any of `projectile-ignored-projects'"
   (or (mapcar (lambda (p) (s-starts-with-p p filepath)) projectile-ignored-projects)))
 #+end_src
-
 *** Ispell
 **** Downloading dictionaries
 
