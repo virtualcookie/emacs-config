@@ -1688,40 +1688,6 @@ nearby (also means that if I change the 'main' dictionary I keep my addition).
 (setq ispell-personal-dictionary (expand-file-name ".ispell_personal" doom-private-dir))
 #+end_src
 
-*** Pandoc import
-Sometimes I'm given non-org files, that's very sad. Luckily Pandoc offers a way
-to make that right again, and this package makes that even easier to do.
-#+begin_src emacs-lisp
-(package! org-pandoc-import :recipe
-  (:local-repo "lisp/org-pandoc-import" :files ("*.el" "filters" "preprocessors")))
-#+end_src
-#+begin_src emacs-lisp :tangle yes
-(use-package! org-pandoc-import
-  :after org) 
-  ;; Google Drive integration https://www.emacswiki.org/emacs/GoogleDocs
-;; https://github.com/prasmussen/gdrive
-(defvar gdocs-folder-id "1MGWas-zzpm8ktv2y32gQQRH5FcK9Gyi1"
-     "location for storing org to gdocs exported files, use 'gdrive list  -t <foldername>' to find the id")
- (defun gdoc-export-buffer ()
-      "Export current buffer as google doc to folder identified by gdocs-folder-id"
-      (interactive)
-      (shell-command
-      (format "gdrive upload --mime text/plain --parent %s --file %s"
-          gdocs-folder-id buffer-file-name)))
-;;  gdrive import --parent '1MGWas-zzpm8ktv2y32gQQRH5FcK9Gyi1' 2021-06-16.txt
-(defun gdoc-import-buffer (doc)
-       "Import a file in gdocs-folder-id into current buffer"
-       (interactive
-       (list
-          (completing-read "Choose one: "
-                     (split-string
-                      (shell-command-to-string
-                       (format "gdrive list -q \"'%s' in parents\"" gdocs-folder-id)) "\n"))))
-       ;;  gdrive list -q "'1MGWas-zzpm8ktv2y32gQQRH5FcK9Gyi1' in parents"
-      (insert (replace-regexp-in-string (string ?\C-m) (string ?\C-j) (shell-command-to-string
-      (format "gdrive download -s --format txt --id %s" (car (split-string doc " ")))))))
-;; gdrive export --mime text/plain  1q-cDyKWyM1uzXrjwf0DJbN4LqPesMZo9wURdwkvcFZg
-#+end_src
 
 *** TRAMP
 
@@ -5665,13 +5631,17 @@ no modeline.
 I'll just set this to be within =Organisation= folder for now, in the future it
 could be worth seeing if I could hook this up to a [[https://nextcloud.com/][Nextcloud]] instance.
 #+begin_src emacs-lisp :noweb-ref none :tangle yes
-(setq org-roam-directory "~/Box/org/roam/")
+(setq org-roam-directory "~/orgfiles/org/roam/")
 #+end_src
 
+Unpin Org Roam to checkout the latest release
+#+begin_src emacs-lisp :noweb-ref none :tangle packages.el
+(unpin! org-roam) ;pull in changes for import
+#+end_src
 That said, if the directory doesn't exist we likely don't want to be using roam.
 Since we don't want to trigger errors (which will happen as soon as roam tries
 to initialise), let's not load roam.
-#+begin_src emacs-lisp :noweb-ref none :tangle (if (file-exists-p "~/Box/org/roam/") "no" "packages.el")
+,#+begin_src emacs-lisp :noweb-ref none :tangle (if (file-exists-p "~/orgfiles/org/roam/") "no" "packages.el")
 (package! org-roam :disable t)
 #+end_src
 ***** Modeline file name
