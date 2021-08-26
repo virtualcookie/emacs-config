@@ -9,6 +9,7 @@
 #+property: header-args:elisp :exports code
 #+property: header-args:shell :tangle "setup.sh"
 #+property: header-args :tangle no :results silent :eval no-export
+#+embed: LICENCE :description MIT licence file
 #+options: coverpage:yes
 #+startup: fold
 
@@ -638,6 +639,7 @@ cc                         ; C/C++/Obj-C madness
 ;;csharp                     ; unity, .NET, and mono shenanigans
 data                         ; config/data formats
 ;;(dart +flutter)            ; paint ui and not much else
+;;dhall                      ; JSON with FP sprinkles
 ;;elixir                     ; erlang done right
 ;;elm                        ; care for a cup of TEA?
 emacs-lisp                   ; drown in parentheses
@@ -646,8 +648,9 @@ ess                          ; emacs speaks statistics
 ;;faust                      ; dsp, but you get to keep your soul
 ;;fsharp                     ; ML stands for Microsoft's Language
 ;;fstar                      ; (dependent) types and (monadic) effects and Z3
+;;gdscript                   ; the language you waited for
 ;;(go +lsp)                  ; the hipster dialect
-;; (haskell +lsp)            ; a language that's lazier than I am
+;;(haskell +lsp)             ; a language that's lazier than I am
 ;;hy                         ; readability of scheme w/ speed of python
 ;;idris                      ;
 json                         ; At least it ain't XML
@@ -678,13 +681,13 @@ markdown                     ; writing docs for people to ignore
  ;;+pomodoro                 ; be fruitful with the tomato technique
  +present                    ; using org-mode for presentations
  +roam2)                     ; wander around notes
-;;perl                       ; write code no one else can comprehend
 ;;php                        ; perl's insecure younger brother
 plantuml                     ; diagrams for confusing people more
 ;;purescript                 ; javascript, but functional
 (python +lsp +pyright)       ; beautiful is better than ugly
 ;;qt                         ; the 'cutest' gui framework ever
 ;;racket                     ; a DSL for DSLs
+;;raku                       ; the artist formerly known as perl6
 ;;rest                       ; Emacs as a REST client
 ;;rst                        ; ReST in peace
 ;;(ruby +rails)              ; 1.step {|i| p "Ruby is #{i.even? ? 'love' : 'life'}"}
@@ -698,6 +701,7 @@ swift                      ; who asked for emoji variables?
 ;;terra                      ; Earth and Moon in alignment for performance.
 web                          ; the tubes
 yaml                         ; JSON, but readable
+;;zig                        ; C, but simpler
 #+end_src
 
 **** Everything in Emacs
@@ -4490,7 +4494,7 @@ minor tweaks.
 #+begin_src emacs-lisp
 (setq +org-msg-accent-color "#1a5fb4"
       org-msg-greeting-fmt "\nHi %s,\n\n"
-      org-msg-signature "\n\n#+begin_signature\nAll the best,\\\\\n*Timothy*\n#+end_signature")
+      org-msg-signature "\n\n#+begin_signature\nAll the best,\\\\\n@@html:<b>@@Timothy@@html:</b>@@\n#+end_signature")
 (map! :map org-msg-edit-mode-map
       :after org-msg
       :n "G" #'org-msg-goto-body)
@@ -4834,11 +4838,11 @@ Now and then citations need to happen
 
 ***** Julia support
 =ob-julia= is currently a bit borked, but there's an effort to improve this.
-#+begin_src emacs-lisp :tangle packages.el
+#+begin_src emacs-lisp
 (package! ob-julia :recipe (:local-repo "lisp/ob-julia" :files ("*.el" "julia")))
 #+end_src
 
-#+begin_src emacs-lisp
+#+begin_src emacs-lisp :tangle yes
 (use-package! ob-julia
   :commands org-babel-execute:julia)
 #+end_src
@@ -4901,6 +4905,29 @@ to make that right again, and this package makes that even easier to do.
 #+begin_src emacs-lisp :tangle yes
 (use-package! org-pandoc-import
   :after org)
+  ;; Google Drive integration https://www.emacswiki.org/emacs/GoogleDocs
+;; https://github.com/prasmussen/gdrive
+(defvar gdocs-folder-id "1MGWas-zzpm8ktv2y32gQQRH5FcK9Gyi1"
+     "location for storing org to gdocs exported files, use 'gdrive list  -t <foldername>' to find the id")
+ (defun gdoc-export-buffer ()
+      "Export current buffer as google doc to folder identified by gdocs-folder-id"
+      (interactive)
+      (shell-command
+      (format "gdrive upload --mime text/plain --parent %s --file %s"
+          gdocs-folder-id buffer-file-name)))
+;;  gdrive import --parent '1MGWas-zzpm8ktv2y32gQQRH5FcK9Gyi1' 2021-06-16.txt
+(defun gdoc-import-buffer (doc)
+       "Import a file in gdocs-folder-id into current buffer"
+       (interactive
+       (list
+          (completing-read "Choose one: "
+                     (split-string
+                      (shell-command-to-string
+                       (format "gdrive list -q \"'%s' in parents\"" gdocs-folder-id)) "\n"))))
+       ;;  gdrive list -q "'1MGWas-zzpm8ktv2y32gQQRH5FcK9Gyi1' in parents"
+      (insert (replace-regexp-in-string (string ?\C-m) (string ?\C-j) (shell-command-to-string
+      (format "gdrive download -s --format txt --id %s" (car (split-string doc " ")))))))
+;; gdrive export --mime text/plain  1q-cDyKWyM1uzXrjwf0DJbN4LqPesMZo9wURdwkvcFZg
 #+end_src
 *** Behaviour
 [[xkcd:1319]]
@@ -5043,7 +5070,7 @@ To improve =org-cite=.
 (package! org-cite-csl-activate :recipe (:host github :repo "andras-simonyi/org-cite-csl-activate") :pin "032e765a4cf634fc56abcd18488510d3d5b1ee09")
 #+end_src
 
-#+begin_src emacs-lisp
+#+begin_src emacs-lisp :noweb-ref none :tangle yes
 (use-package! bibtex-completion
   :defer t
   :config
@@ -7060,6 +7087,10 @@ set linetype 6 lw 2 lc rgb '%s' # yellow
 set linetype 7 lw 2 lc rgb '%s' # teal
 set linetype 8 lw 2 lc rgb '%s' # violet
 
+# border styles
+set tics out nomirror
+set border 3
+
 # palette
 set palette maxcolors 8
 set palette defined ( 0 '%s',\
@@ -8142,20 +8173,43 @@ access.
 In the "universal preamble", we already embed the source =.org= file, but it would
 be nice to embed all the tangled files. This is fairly easy to accomplish by
 mapping each tangled file to a form which embeds the file if it exists.
+Considering we're going this far, why not add a dedicated =#+emded= keyword, so we
+can embed whatever we want.
+
 #+begin_src emacs-lisp
-(defun org-latex-embed-tangled-files ()
+(defun org-latex-embed-extra-files ()
   "Return a string that uses embedfile to embed all tangled files."
   (mapconcat
-   (lambda (tangle-file)
-     (format "\\IfFileExists{%1$s}{\\embedfile[desc=Tangled %2$s file]{%1$s}}{}"
-             (->> (car tangle-file)
+   (lambda (file-desc)
+     (format "\\IfFileExists{%1$s}{\\embedfile[desc=%2$s]{%1$s}}{}"
+             (thread-last (car file-desc)
                (replace-regexp-in-string "\\\\" "\\\\\\\\")
                (replace-regexp-in-string "~" "\\\\string~"))
-             (cdr tangle-file)))
-   (mapcar (lambda (f-block) (cons (or (car f-block) (caddr (cadr f-block))) (caadr f-block)))
-           (org-babel-tangle-collect-blocks)) ; all files being tangled to
+             (cdr file-desc)))
+   (append
+    (mapcar (lambda (f-block)
+              (let ((file-lang (cons (or (car f-block) (caddr (cadr f-block))) (caadr f-block))))
+                (cons (car file-lang) (format "Tangled %s file" (cdr file-lang)))))
+            (org-babel-tangle-collect-blocks)) ; all files being tangled to
+    (let (extra-files)
+      (save-excursion
+        (goto-char (point-min))
+        (while (re-search-forward "^[ \t]*#\\+embed:" nil t)
+          (let* ((file-desc (split-string (org-element-property :value (org-element-at-point)) " :desc\\(?:ription\\)? ")))
+            (push (cons (car file-desc) (or (cdr file-desc) "Extra file")) extra-files))))
+      (nreverse extra-files)))
    "\n"))
 #+end_src
+
+Now all tangled files will be embedded, and we can embed arbitrary files like
+so:
+#+begin_src org
+,#+embed: some-file :description flavour text about the file
+#+end_src
+
+This currently won't complete or anything like that, as we haven't told Org that
+it's a keyword yet. It's also LaTeX-specific, so maybe it should be changed to
+=#+latex_embed= or something like that.
 
 ***** Content-feature-preamble association
 
@@ -8243,11 +8297,12 @@ tests should be very versatile.
     (org-latex-use-microtype . microtype)
     ((and org-latex-italic-quotes "^[ \t]*#\\+begin_quote\\|\\\\begin{quote}") . italic-quotes)
     (org-latex-par-sep . par-sep)
-    ((org-latex-embed-tangled-files) . embed-files)
+    ((org-latex-embed-extra-files) . embed-files)
     ((and org-latex-embed-files "^[ \t]*#\\+begin_src\\|^[ \t]*#\\+BEGIN_SRC") . embed-tangled)
     ("^[ \t]*\\(?:[-+*]\\|[0-9]+[.)]\\|[A-Za-z]+[.)]\\) \\[[ -X]\\]" . checkbox)
     ("^[ \t]*#\\+begin_warning\\|\\\\begin{warning}" . box-warning)
     ("^[ \t]*#\\+begin_info\\|\\\\begin{info}"       . box-info)
+    ("^[ \t]*#\\+begin_notes\\|\\\\begin{notes}"     . box-notes)
     ("^[ \t]*#\\+begin_success\\|\\\\begin{success}" . box-success)
     ("^[ \t]*#\\+begin_error\\|\\\\begin{error}"     . box-error))
   "Org feature tests and associated LaTeX feature flags.
@@ -8307,7 +8362,7 @@ introduce an =:order= keyword. Using this I'll arrange snippets as follows.
     (caption       :snippet org-latex-caption-preamble :order 2.1)
     (microtype     :snippet "\\usepackage[activate={true,nocompatibility},final,tracking=true,kerning=true,spacing=true,factor=2000]{microtype}\n" :order 0.1)
     (embed-files   :snippet org-latex-embed-files-preamble :order -2)
-    (embed-tangled :requires embed-files :snippet (concat (org-latex-embed-tangled-files) "\n") :order -1)
+    (embed-tangled :requires embed-files :snippet (concat (org-latex-embed-extra-files) "\n") :order -1)
     (acronym       :snippet "\\newcommand{\\acr}[1]{\\protect\\textls*[110]{\\scshape #1}}\n\\newcommand{\\acrs}{\\protect\\scalebox{.91}[.84]{\\hspace{0.15ex}s}}" :order 0.4)
     (italic-quotes :snippet "\\renewcommand{\\quote}{\\list{}{\\rightmargin\\leftmargin}\\item\\relax\\em}\n" :order 0.5)
     (par-sep       :snippet "\\setlength{\\parskip}{\\baselineskip}\n\\setlength{\\parindent}{0pt}\n" :order 0.5)
@@ -8319,6 +8374,7 @@ introduce an =:order= keyword. Using this I'll arrange snippets as follows.
     (.fancy-box    :requires .pifont    :snippet org-latex-box-preamble :order 3.9)
     (box-warning   :requires .fancy-box :snippet "\\defsimplebox{warning}{e66100}{\\ding{68}}{Warning}" :order 4)
     (box-info      :requires .fancy-box :snippet "\\defsimplebox{info}{3584e4}{\\ding{68}}{Information}" :order 4)
+    (box-notes     :requires .fancy-box :snippet "\\defsimplebox{notes}{26a269}{\\ding{43}}{Notes}" :order 4)
     (box-success   :requires .fancy-box :snippet "\\defsimplebox{success}{26a269}{\\ding{68}}{\\vspace{-\\baselineskip}}" :order 4)
     (box-error     :requires .fancy-box :snippet "\\defsimplebox{error}{c01c28}{\\ding{68}}{Important}" :order 4))
   "LaTeX features and details required to implement them.
