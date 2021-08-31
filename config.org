@@ -4933,7 +4933,7 @@ to make that right again, and this package makes that even easier to do.
 [[xkcd:1319]]
 **** Tweaking defaults
 #+begin_src emacs-lisp
-(setq org-directory "~/org"                      ; let's put files here
+(setq org-directory "~/orgfiles/org"              ; let's put files here
       org-use-property-inheritance t              ; it's convenient to have properties inherited
       org-log-done 'time                          ; having the time a item is done sounds convenient
       org-list-allow-alphabetical t               ; have a. A. a) A) list bullets
@@ -5386,7 +5386,7 @@ set up org-capture.
   (setq doct-after-conversion-functions '(+doct-iconify-capture-templates))
 
   ;; (defvar +org-capture-recipies  "~/Desktop/TEC/Organisation/recipies.org")
-  (defvar +org-capture-recipies  "~/org/personal/household/cookbook.org")
+  (defvar +org-capture-recipies  "~/orgfiles/org/personal/household/cookbook.org")
 
   (defun set-org-capture-templates ()
     (setq org-capture-templates
