@@ -328,9 +328,9 @@ It's useful to have some basic personal information
 #+end_src
 Apparently this is used by ~GPG~, and all sorts of other things.
 
-Speaking of ~GPG~, I want to use =~/.authsource.gpg= instead of the default in
+Speaking of ~GPG~, I want to use =~/.authinfo.gpg= instead of the default in
 =~/.emacs.d=. Why? Because my home directory is already cluttered, so this won't
-make a difference, and I don't want to accidentaly purge this file (I have done
+make a difference, and I don't want to accidentally purge this file (I have done
 src_shell{rm -rf~/.emac.d~ before}. I also want to cache as much as possible, as
 my home machine is pretty safe, and my laptop is shutdown a lot.
 #+begin_src emacs-lisp
@@ -570,7 +570,7 @@ word-wrap                  ; soft wrapping with language-aware indent
 (dired +icons)               ; making dired pretty [functional]
 electric                     ; smarter, keyword-based electric-indent
 (ibuffer +icons)             ; interactive buffer management
-(undo +tree)                 ; persistent, smarter undo for your inevitable mistakes
+undo                         ; persistent, smarter undo for your inevitable mistakes
 vc                           ; version-control and Emacs, sitting in a tree
 #+end_src
 
@@ -860,6 +860,120 @@ avoid polluting the output.
   (quiet! (apply orig-fn args)))
 
 (advice-add 'org-babel-execute-src-block :around #'doom-shut-up-a)
+#+end_src
+*** Elisp REPL
+
+I think an elisp REPL sounds like a fun idea, even if not a particularly useful
+one 😛. We can do this by adding a new command in =cli.el=.
+
+#+begin_src emacs-lisp :tangle cli.el
+(defcli! repl ((in-rlwrap-p ["--rl"] "For internal use only."))
+  "Start an elisp REPL."
+  (when (and (executable-find "rlwrap") (not in-rlwrap-p))
+    ;; For autocomplete
+    (setq autocomplete-file "/tmp/doom_elisp_repl_symbols")
+    (unless (file-exists-p autocomplete-file)
+      (princ "\e[0;33mInitialising autocomplete list...\e[0m\n")
+      (with-temp-buffer
+        (cl-do-all-symbols (s)
+          (let ((sym (symbol-name s)))
+            (when (string-match-p "\\`[[:ascii:]][[:ascii:]]+\\'" sym)
+              (insert sym "\n"))))
+        (write-region nil nil autocomplete-file)))
+    (princ "\e[F")
+    (throw 'exit (list "rlwrap" "-f" autocomplete-file
+                       (concat doom-emacs-dir "bin/doom") "repl" "--rl")))
+
+  (doom-initialize-packages)
+  (require 'engrave-faces-ansi)
+  (setq engrave-faces-ansi-color-mode '3-bit)
+
+  ;; For some reason (require 'parent-mode) doesn't work :(
+  (defun parent-mode-list (mode)
+    "Return a list of MODE and all its parent modes.
+
+The returned list starts with the parent-most mode and ends with MODE."
+    (let ((result ()))
+      (parent-mode--worker mode (lambda (mode)
+                                  (push mode result)))
+      result))
+  (defun parent-mode--worker (mode func)
+    "For MODE and all its parent modes, call FUNC.
+
+FUNC is first called for MODE, then for its parent, then for the parent's
+parent, and so on.
+
+MODE shall be a symbol referring to a function.
+FUNC shall be a function taking one argument."
+    (funcall func mode)
+    (when (not (fboundp mode))
+      (signal 'void-function (list mode)))
+    (let ((modefunc (symbol-function mode)))
+      (if (symbolp modefunc)
+          ;; Hande all the modes that use (defalias 'foo-parent-mode (stuff)) as
+          ;; their parent
+          (parent-mode--worker modefunc func)
+        (let ((parentmode (get mode 'derived-mode-parent)))
+          (when parentmode
+            (parent-mode--worker parentmode func))))))
+  (provide 'parent-mode)
+  ;; Some extra highlighting (needs parent-mode)
+  (require 'rainbow-delimiters)
+  (require 'highlight-quoted)
+  (require 'highlight-numbers)
+  (setq emacs-lisp-mode-hook '(rainbow-delimiters-mode
+                               highlight-quoted-mode
+                               highlight-numbers-mode))
+  ;; Pretty print
+  (defun pp-sexp (sexp)
+    (with-temp-buffer
+      (cl-prettyprint sexp)
+      (emacs-lisp-mode)
+      (font-lock-ensure)
+      (with-current-buffer (engrave-faces-ansi-buffer)
+        (princ (string-trim (buffer-string)))
+        (kill-buffer (current-buffer)))))
+  ;; Now do the REPL
+  (defvar accumulated-input nil)
+  (while t
+    (condition-case nil
+        (let ((input (if accumulated-input
+                         (read-string "\e[31m .\e[0m  ")
+                       (read-string "\e[31mλ:\e[0m "))))
+          (setq input (concat accumulated-input
+                              (when accumulated-input "\n")
+                              input))
+          (cond
+           ((string-match-p "\\`[[:space:]]*\\'" input)
+            nil)
+           ((string= input "exit")
+            (princ "\n") (kill-emacs 0))
+           (t
+            (condition-case err
+                (let ((input-sexp (car (read-from-string input))))
+                  (setq accumulated-input nil)
+                  (pp-sexp (eval input-sexp))
+                  (princ "\n"))
+              ;; Caused when sexp in unbalanced
+              (end-of-file (setq accumulated-input input))
+              (error
+               (cl-destructuring-bind (backtrace &optional type data . _)
+                   (cons (doom-cli--backtrace) err)
+                 (princ (concat "\e[1;31mERROR:\e[0m " (get type 'error-message)))
+                 (princ "\n       ")
+                 (pp-sexp (cons type data))
+                 (when backtrace
+                   (print! (bold "Backtrace:"))
+                   (print-group!
+                    (dolist (frame (seq-take backtrace 10))
+                      (print!
+                       "%0.74s" (replace-regexp-in-string
+                                 "[\n\r]" "\\\\n"
+                                 (format "%S" frame))))))
+                 (princ "\n")))))))
+      ;; C-d causes an end-of-file error
+      (end-of-file (princ "exit\n") (kill-emacs 0)))
+    (unless accumulated-input (princ "\n"))))
 #+end_src
 
 *** Asynchronous config tangling
@@ -1373,8 +1487,6 @@ from Doom or MELPA/ELPA/Emacsmirror:
 #+end_src
 
 Specify a ~:branch~ to install a package from a particular branch or tag.
-This is required for some packages whose default branch isn't 'master' (which
-our package manager can't deal with; see [[https://github.com/raxod502/straight.el/issues/279][raxod502/straight.el#279]])
 #+begin_src emacs-lisp
 (package! builtin-package :recipe (:branch "develop"))
 #+end_src
@@ -1879,6 +1991,38 @@ so I'd like to make sure we have a recent version.
 With all our fancy Emacs themes, my terminal is missing out!
 #+begin_src emacs-lisp :tangle packages.el
 (package! theme-magic :pin "844c4311bd26ebafd4b6a1d72ddcc65d87f074e3")
+#+end_src
+
+Theme magic takes a look at a number of faces, the saturation levels, and colour
+differences to try to cleverly pick eight colours to use. However, it uses the
+same colours for the light variants, and doesn't always make the best picks.
+Since we're using =doom-themes=, our life is a little easier and we can use the
+colour utilities from Doom themes to easily grab sensible colours and generate
+lightened versions --- let's do that.
+
+#+begin_src emacs-lisp
+(use-package! theme-magic
+  :commands theme-magic-from-emacs
+  :config
+  (defadvice! theme-magic--auto-extract-16-doom-colors ()
+    :override #'theme-magic--auto-extract-16-colors
+    (list
+     (face-attribute 'default :background)
+     (doom-color 'error)
+     (doom-color 'success)
+     (doom-color 'type)
+     (doom-color 'keywords)
+     (doom-color 'constants)
+     (doom-color 'functions)
+     (face-attribute 'default :foreground)
+     (face-attribute 'shadow :foreground)
+     (doom-blend 'base8 'error 0.1)
+     (doom-blend 'base8 'success 0.1)
+     (doom-blend 'base8 'type 0.1)
+     (doom-blend 'base8 'keywords 0.1)
+     (doom-blend 'base8 'constants 0.1)
+     (doom-blend 'base8 'functions 0.1)
+     (face-attribute 'default :foreground))))
 #+end_src
 
 Let's automatically update terminals on theme change (as long as ~pywal~ is available).
@@ -3777,18 +3921,18 @@ Doom already loads =define-word=, and provides it's own definition service using
 advantages, namely:
 + speed
 + integration of multiple dictionaries
-[[http://goldendict.org/][GoldenDict]] seems like the best option currently avalible, but lacks a CLI.
+[[http://goldendict.org/][GoldenDict]] seems like the best option currently available, but lacks a CLI.
 Hence, we'll fall back to [[https://dushistov.github.io/sdcv/][sdcv]] (a CLI version of StarDict) for now.
 To interface with this, we'll use a my =lexic= package.
 
 #+attr_html: :class invertible :alt Screenshot of the lexic-mode view of "literate"
 [[https://tecosaur.com/lfs/emacs-config/screenshots/lexic.png]]
 
-#+begin_src emacs-lisp :tangle packages.el
+#+begin_src emacs-lisp :tangle (if (executable-find "sdcv") "packages.el" "no")
 (package! lexic :recipe (:local-repo "lisp/lexic"))
 #+end_src
 
-Given that a request for a CLI is the most upvoted issue on GitHub for
+Given that a request for a CLI is the [[https://github.com/goldendict/goldendict/issues/37][most upvoted issue]] on GitHub for
 GoldenDict, it's likely we'll be able to switch from ~sdcv~ to that in the future.
 
 Since GoldenDict supports StarDict files, I expect this will be a relatively
@@ -3796,7 +3940,7 @@ painless switch.
 
 We start off by loading =lexic=, then we'll integrate it into pre-existing
 definition functionality (like ~+lookup/dictionary-definition~).
-#+begin_src emacs-lisp
+#+begin_src emacs-lisp :tangle (if (executable-find "sdcv") "yes" "no")
 (use-package! lexic
   :commands lexic-search lexic-list-dictionary
   :config
@@ -3820,7 +3964,7 @@ definition functionality (like ~+lookup/dictionary-definition~).
 #+end_src
 
 Now let's use this instead of wordnet.
-#+begin_src emacs-lisp
+#+begin_src emacs-lisp :tangle (if (executable-find "sdcv") "yes" "no")
 (defadvice! +lookup/dictionary-definition-lexic (identifier &optional arg)
   "Look up the definition of the word at point (or selection) using `lexic-search'."
   :override #'+lookup/dictionary-definition
@@ -3830,6 +3974,23 @@ Now let's use this instead of wordnet.
          current-prefix-arg))
   (lexic-search identifier nil nil t))
 #+end_src
+
+Lastly, I want to make sure I have some dictionaries set up. I've put a tarball
+of dictionaries online which we can download if none seem to be present on the
+system.
+#+begin_src shell :tangle (if (and (executable-find "sdsv") (not (file-exists-p (concat (or (getenv "STARDICT_DATA_DIR") (concat (or "~/.local/share" (getenv "XDG_DATA_HOME")) "/stardict")) "/dic")))) "setup.sh" "no")
+DIC_FOLDER=${STARDICT_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/stardict}/dic
+if [ ! -d "$DIC_FOLDER" ]; then
+    TMP="$(mktemp -d /tmp/dict-XXX)"
+    cd "$TMP"
+    curl -A "Mozilla/4.0" -o "stardict.tar.gz" "https://tecosaur.com/resources/config/stardict.tar.gz"
+    tar -xf "stardict.tar.gz"
+    rm "stardict.tar.gz"
+    mkdir -p "$DIC_FOLDER"
+    mv * "$DIC_FOLDER"
+fi
+#+end_src
+
 ** Mail
 [[xkcd:1467]]
 
