@@ -310,7 +310,7 @@ for more info).
 #+end_src
 
 #+begin_src shell :exports none :comments no :tangle-mode (identity #o755)
-#!/bin/bash
+#!/usr/bin/env bash
 #+end_src
 
 This is to set the bash environment variables so the emacs binary is found when
@@ -991,6 +991,23 @@ straightforward, I'll just redefine it to a simpler, async, function.
 (org-babel-tangle-file \\\"%s\\\"))\""
              +literate-config-file))))
 #+end_src
+*** Dashboard quick actions
+
+When using the dashboard, there are often a small number of actions I will take.
+As the dashboard is it's own major mode, there is no need to suffer the tyranny
+of unnecessary keystrokes --- we can simply bind common actions to a single key!
+
+#+begin_src emacs-lisp
+(map! :map +doom-dashboard-mode-map
+      :ne "f" #'find-file
+      :ne "r" #'consult-recent-file
+      :ne "p" #'doom/open-private-config
+      :ne "c" (cmd! (find-file (expand-file-name "config.org" doom-private-dir)))
+      :ne "." (cmd! (doom-project-find-file "~/.config/")) ; . for dotfiles
+      :ne "b" #'+vertico/switch-workspace-buffer
+      :ne "B" #'consult-buffer)
+#+end_src
+
 ** Other things
 *** Editor interaction
 **** Mouse buttons
@@ -1331,7 +1348,9 @@ I prefer the dashboard, so let's ensure that's always switched to in new frames.
 
 (when (daemonp)
   (add-hook 'emacs-startup-hook #'greedily-do-daemon-setup)
-  (add-hook! 'server-after-make-frame-hook (switch-to-buffer +doom-dashboard-name)))
+  (add-hook! 'server-after-make-frame-hook
+    (unless (string-match-p "\\*draft" (buffer-name))
+      (switch-to-buffer +doom-dashboard-name))))
 #+end_src
 *** Emacs client wrapper
 I frequently want to make use of Emacs while in a terminal emulator. To make
@@ -1429,6 +1448,50 @@ set aliases for the terminal-forced variants.
 alias m='e --eval "(progn (magit-status) (delete-other-windows))"'
 alias mt="m -t"
 alias et="e -t"
+#+end_src
+*** Prompt to run setup script
+
+At various points in this config, content is conditionally tangled to
+=./setup.sh=. It's no good just putting content there if it isn't run though.
+To help remind me to run it when needed, let's add a little prompt when there's
+anything to be run.
+
+#+name: run-setup
+#+begin_src emacs-lisp :tangle no
+(if (file-exists-p "setup.sh")
+    (if (string-empty-p (string-trim (with-temp-buffer (insert-file-contents "setup.sh") (buffer-string)) "#!/usr/bin/env bash"))
+        (message ";; Setup script is empty")
+      (message ";; Detected content in the setup script")
+      (pp-to-string
+       `(unless noninteractive
+          (defun +config-run-setup ()
+            (when (yes-or-no-p (format "%s The setup script has content. Check and run the script?"
+                                       (propertize "Warning!" 'face '(bold warning))))
+              (find-file (expand-file-name "setup.sh" doom-private-dir))
+              (when (yes-or-no-p "Would you like to run this script?")
+                (async-shell-command "./setup.sh"))))
+          (add-hook! 'doom-init-ui-hook
+            (run-at-time nil nil #'+config-run-setup)))))
+  (message ";; setup.sh did not exist during tangle. Tangle again.")
+  (pp-to-string
+   `(unless noninteractive
+      (add-hook! 'doom-init-ui-hook
+        (let ((default-directory doom-private-dir))
+          (setq tangle-proc (start-process "tangle-config" (get-buffer-create " *tangle config*")
+                                           "emacs" "--batch" "--eval"
+                                           (format "(progn \
+(require 'org) \
+(setq org-confirm-babel-evaluate nil) \
+(org-babel-tangle-file \"%s\"))" +literate-config-file)))
+          (add-hook! 'kill-emacs-hook
+            (when (and (process-live-p tangle-proc)
+                       (yes-or-no-p "Config is currently retangling, would you please wait a few seconds?"))
+              (switch-to-buffer " *tangle config*")
+              (signal 'quit nil))))))))
+#+end_src
+
+#+begin_src emacs-lisp :noweb no-export
+<<run-setup()>>
 #+end_src
 
 * Packages
@@ -1653,6 +1716,8 @@ already clear, and there's no need for a different face.
 #+begin_quote
 From the =:tools magit= module.
 #+end_quote
+
+[[xkcd:1597]]
 
 Magit is absolutely great by default. The diffs don't get any
 syntax-highlighting-love though which is a bit sad. Thankfully
@@ -4622,6 +4687,10 @@ LD_LIBRARY_PATH=/usr/local/lib exec /usr/local/bin/msmtp "$@"
 #+end_src
 
 *** Mu4e
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref mu4e-conf
+:END:
+
 Webmail clients are nice and all, but I still don't believe that SPAs in my
 browser can replaced desktop apps ... sorry Gmail. I'm also liking google less
 and less.
@@ -4651,6 +4720,13 @@ Alternatively, I may need to add the =/usr/share/= path.
 (add-to-list 'load-path "/usr/share/emacs/site-lisp/mu4e")
 #+end_src
 
+Let's also just shove all the Elisp code here in an src_elisp{(after! ...)} block.
+#+begin_src emacs-lisp :noweb no-export :tangle yes :noweb-ref nil
+(after! mu4e
+  <<mu4e-conf>>
+)
+#+end_src
+
 **** Viewing Mail
 There seem to be some advantages with using Gnus' article view (such as inline
 images), and judging from [[https://github.com/djcb/mu/pull/1442#issuecomment-591695814][djcb/mu!1442 (comment)]] this seems to be the 'way of
@@ -4662,32 +4738,31 @@ fancy chars, and make sure they get the correct width.
 To account for the increase width of each flag character, and make perform a
 few more visual tweaks, we'll tweak the headers a bit
 #+begin_src emacs-lisp
-(after! mu4e
-  (setq mu4e-headers-fields
-        '((:flags . 6)
-          (:account-stripe . 2)
-          (:from-or-to . 25)
-          (:folder . 10)
-          (:recipnum . 2)
-          (:subject . 80)
-          (:human-date . 8))
-        +mu4e-min-header-frame-width 142
-        mu4e-headers-date-format "%d/%m/%y"
-        mu4e-headers-time-format "⧖ %H:%M"
-        mu4e-headers-results-limit 1000
-        mu4e-index-cleanup t)
+(setq mu4e-headers-fields
+      '((:flags . 6)
+        (:account-stripe . 2)
+        (:from-or-to . 25)
+        (:folder . 10)
+        (:recipnum . 2)
+        (:subject . 80)
+        (:human-date . 8))
+      +mu4e-min-header-frame-width 142
+      mu4e-headers-date-format "%d/%m/%y"
+      mu4e-headers-time-format "⧖ %H:%M"
+      mu4e-headers-results-limit 1000
+      mu4e-index-cleanup t)
 
-  (add-to-list 'mu4e-bookmarks
-               '(:name "Yesterday's messages" :query "date:2d..1d" :key ?y) t)
+(add-to-list 'mu4e-bookmarks
+             '(:name "Yesterday's messages" :query "date:2d..1d" :key ?y) t)
 
-  (defvar +mu4e-header--folder-colors nil)
-  (appendq! mu4e-header-info-custom
-            '((:folder .
-               (:name "Folder" :shortname "Folder" :help "Lowest level folder" :function
-                (lambda (msg)
-                  (+mu4e-colorize-str
-                   (replace-regexp-in-string "\\`.*/" "" (mu4e-message-field msg :maildir))
-                   '+mu4e-header--folder-colors)))))))
+(defvar +mu4e-header--folder-colors nil)
+(appendq! mu4e-header-info-custom
+          '((:folder .
+             (:name "Folder" :shortname "Folder" :help "Lowest level folder" :function
+              (lambda (msg)
+                (+mu4e-colorize-str
+                 (replace-regexp-in-string "\\`.*/" "" (mu4e-message-field msg :maildir))
+                 '+mu4e-header--folder-colors))))))
 #+end_src
 
 We'll also use a nicer alert icon
@@ -4697,27 +4772,36 @@ We'll also use a nicer alert icon
 **** Sending Mail
 Let's send emails too.
 #+begin_src emacs-lisp
-(after! mu4e
-  (setq sendmail-program "/usr/bin/msmtp"
-        send-mail-function #'smtpmail-send-it
-        message-sendmail-f-is-evil t
-        message-sendmail-extra-arguments '("--read-envelope-from"); , "--read-recipients")
-        message-send-mail-function #'message-send-mail-with-sendmail))
+(setq sendmail-program "/usr/bin/msmtp"
+      send-mail-function #'smtpmail-send-it
+      message-sendmail-f-is-evil t
+      message-sendmail-extra-arguments '("--read-envelope-from"); , "--read-recipients")
+      message-send-mail-function #'message-send-mail-with-sendmail)
 #+end_src
 
 It's also nice to avoid accidentally sending emails with the wrong account. If
 we can send from the address in the ~To~ field, let's do that. Opening a prompt
 otherwise also seems sensible.
 
-We can register Emacs as a potential email client with the following desktop
-file, thanks to Etienne Deparis's [[https://etienne.depar.is/emacs.d/mu4e.html][Mu4e customization]].
+We can register Emacs as a potential email client with a desktop file. We could
+put an =emacsclient ...= entry in the =Exec= field, but I've found this a bit dodgy.
+Instead let's package the =emacslient= behaviour in a little executable
+=~/.local/bin/emacsmail=.
+
+#+begin_src shell :tangle ~/.local/bin/emacsmail :shebang "#!/usr/bin/env sh" :mkdirp yes :tangle-mode (identity #o755) :comments no
+emacsclient -create-frame --alternate-editor='' --no-wait --eval \
+"(progn (x-focus-frame nil) (mu4e-compose-from-mailto \"$1\" t))"
+#+end_src
+
+Now we can just call that in a desktop file.
+
 #+begin_src conf :tangle ~/.local/share/applications/emacsmail.desktop :mkdirp yes
 [Desktop Entry]
-Name=Compose message in Emacs
+Name=Mu4e
 GenericName=Compose a new message with Mu4e in Emacs
 Comment=Open mu4e compose window
 MimeType=x-scheme-handler/mailto;
-Exec=emacsclient -create-frame --alternate-editor="" --no-wait --eval '(progn (x-focus-frame nil) (mu4e-compose-from-mailto "%u"))'
+Exec=emacsmail %u
 Icon=emacs
 Type=Application
 Terminal=false
@@ -4732,21 +4816,38 @@ update-desktop-database ~/.local/share/applications
 
 We also want to define ~mu4e-compose-from-mailto~.
 #+begin_src emacs-lisp
-(defun mu4e-compose-from-mailto (mailto-string)
+(defun mu4e-compose-from-mailto (mailto-string &optional quit-frame-after)
   (require 'mu4e)
   (unless mu4e~server-props (mu4e t) (sleep-for 0.1))
   (let* ((mailto (rfc2368-parse-mailto-url mailto-string))
          (to (cdr (assoc "To" mailto)))
          (subject (or (cdr (assoc "Subject" mailto)) ""))
          (body (cdr (assoc "Body" mailto)))
-         (org-msg-greeting-fmt (if (assoc "Body" mailto)
-                                   (replace-regexp-in-string "%" "%%"
-                                                             (cdr (assoc "Body" mailto)))
-                                 org-msg-greeting-fmt))
          (headers (-filter (lambda (spec) (not (-contains-p '("To" "Subject" "Body") (car spec)))) mailto)))
-    (mu4e~compose-mail to subject headers)))
+    (when-let ((mu4e-main (get-buffer mu4e-main-buffer-name)))
+      (switch-to-buffer mu4e-main))
+    (mu4e~compose-mail to subject headers)
+    (when body
+      (goto-char (point-min))
+      (if (eq major-mode 'org-msg-edit-mode)
+          (org-msg-goto-body)
+        (mu4e-compose-goto-bottom))
+      (insert body))
+    (goto-char (point-min))
+    (cond ((null to) (search-forward "To: "))
+          ((string= "" subject) (search-forward "Subject: "))
+          (t (if (eq major-mode 'org-msg-edit-mode)
+                 (org-msg-goto-body)
+               (mu4e-compose-goto-bottom))))
+    (font-lock-ensure)
+    (when evil-normal-state-minor-mode
+      (evil-append 1))
+    (when quit-frame-after
+      (add-hook 'kill-buffer-hook
+                `(lambda ()
+                   (when (eq (selected-frame) ,(selected-frame))
+                     (delete-frame)))))))
 #+end_src
-This may not quite function as intended for now due to [[github:jeremy-compostella/org-msg/issues/52][jeremy-compostella/org-msg#52]].
 
 It would also be nice to change the name pre-filled in =From:= when drafting.
 #+begin_src emacs-lisp
@@ -4763,6 +4864,77 @@ We can also use this a signature,
 #+begin_src emacs-lisp
 (setq message-signature mu4e-from-name)
 #+end_src
+**** Adding =X-Woof= headers
+
+I'm fairly active on the Org mailing list (ML). The Org ML has a linked
+bug/patch tracker, https://updates.orgmode.org/ managed by [[https://github.com/bzg/woof][Woof]]. However, I feel
+like I spend too much time looking up what the appropriate headers are for
+updating the status of bugs and patches. What I need, is some sort of convenient
+tool. Let's write one.
+
+First, a function that asks what I want to do and returns the appropriate =X-Woof=
+header.
+#+begin_src emacs-lisp
+(defun +mu4e-get-woof-header ()
+  (pcase (read-char
+          (format "\
+%s
+  %s Declare %s Applied %s Aborted
+%s
+  %s Confirm %s Fixed
+%s
+  %s Request %s Resolved
+
+%s remove X-Woof header"
+                  (propertize "Patch" 'face 'outline-3)
+                  (propertize "p" 'face '(bold consult-key))
+                  (propertize "a" 'face '(bold consult-key))
+                  (propertize "A" 'face '(bold consult-key))
+                  (propertize "Bug" 'face 'outline-3)
+                  (propertize "b" 'face '(bold consult-key))
+                  (propertize "f" 'face '(bold consult-key))
+                  (propertize "Help" 'face 'outline-3)
+                  (propertize "h" 'face '(bold consult-key))
+                  (propertize "r" 'face '(bold consult-key))
+                  (propertize "x" 'face '(bold error))))
+    (?p "X-Woof-Patch: confirmed")
+    (?a "X-Woof-Patch: applied")
+    (?A "X-Woof-Patch: canceled")
+    (?b "X-Woof-Bug: confirmed")
+    (?f "X-Woof-Bug: fixed")
+    (?r "X-Woof-Help: confirmed")
+    (?r "X-Woof-Help: canceled")
+    (?x 'delete)))
+#+end_src
+
+Now we just need a function which will add such a header to a buffer
+#+begin_src emacs-lisp
+(defun +mu4e-insert-woof-header ()
+  "Insert an X-Woof header into the current message."
+  (interactive)
+  (when-let ((header (+mu4e-get-woof-header)))
+    (save-excursion
+      (goto-char (point-min))
+      (search-forward "--text follows this line--")
+      (unless (eq header 'delete)
+        (beginning-of-line)
+        (insert header "\n")
+        (forward-line -1))
+      (when (re-search-backward "^X-Woof-" nil t)
+        (kill-whole-line)))))
+
+(map! :map mu4e-compose-mode-map
+      :localleader
+      :desc "Insert X-Woof Header" "w" #'+mu4e-insert-woof-header)
+
+(map! :map org-msg-edit-mode-map
+      :after org-msg
+      :localleader
+      :desc "Insert X-Woof Header" "w" #'+mu4e-insert-woof-header)
+#+end_src
+
+Lovely! That should make adding these headers a breeze.
+
 *** Org Msg
 Doom does a fantastic stuff with the defaults with this, so we only make a few
 minor tweaks.
@@ -4932,13 +5104,33 @@ Then adding a regex for it to =~/.config/git/config=
 Testing patches from the ML is currently more hassle than it needs to be. Let's
 change that.
 #+begin_src emacs-lisp
-(defvar org-ml-target-dir "~/.emacs.d/.local/straight/repos/org-mode/")
-(defvar org-ml-max-age 600
+(defvar +org-ml-target-dir "~/.emacs.d/.local/straight/repos/org-mode/")
+(defvar +org-ml-max-age 600
   "Maximum permissible age in seconds.")
-(defvar org-ml--cache-timestamp 0)
-(defvar org-ml--cache nil)
+(defvar +org-ml--cache-timestamp 0)
+(defvar +org-ml--cache nil)
 
-(defun org-ml-current-patches ()
+(define-minor-mode +org-ml-patchy-mood-mode
+  "Apply patches to Org in bulk."
+  :global t
+  (let ((action (cons "apply patch to org" #'+org-ml-apply-patch)))
+    (if +org-ml-patchy-mood-mode
+        (add-to-list 'mu4e-view-actions action)
+      (setq mu4e-view-actions (delete action mu4e-view-actions)))))
+
+(defun +org-ml-apply-patch (msg)
+  "Apply the patch in the current message to Org."
+  (interactive)
+  (unless msg (setq msg (mu4e-message-at-point)))
+  (with-current-buffer (get-buffer-create "*Shell: Org apply patches*")
+    (erase-buffer)
+    (let* ((default-directory +org-ml-target-dir)
+           (exit-code (call-process "git" nil t nil "am" (mu4e-message-field msg :path))))
+      (magit-refresh)
+      (when (not (= 0 exit-code))
+        (+popup/buffer)))))
+
+(defun +org-ml-current-patches ()
   "Get the currently open patches, as a list of alists.
 Entries of the form (subject . id)."
   (delq nil
@@ -4959,41 +5151,33 @@ Entries of the form (subject . id)."
          (with-current-buffer (url-retrieve-synchronously "https://updates.orgmode.org/data/patches")
            (json-parse-buffer :object-type 'plist)))))
 
-(defun org-ml-select-patch-thread ()
+(defun +org-ml-select-patch-thread ()
   "Find and apply a proposed Org patch."
   (interactive)
   (let* ((current-workspace (+workspace-current))
          (patches (progn
-                    (when (or (not org-ml--cache)
-                              (> (- (float-time) org-ml--cache-timestamp)
-                                 org-ml-max-age))
-                      (setq org-ml--cache (org-ml-current-patches)
-                            org-ml--cache-timestamp (float-time)))
-                    org-ml--cache))
+                    (when (or (not +org-ml--cache)
+                              (> (- (float-time) +org-ml--cache-timestamp)
+                                 +org-ml-max-age))
+                      (setq +org-ml--cache (+org-ml-current-patches)
+                            +org-ml--cache-timestamp (float-time)))
+                    +org-ml--cache))
          (msg-id (cdr (assoc (completing-read
                               "Thread: " (mapcar #'car patches))
                              patches))))
     (+workspace-switch +mu4e-workspace-name)
     (mu4e-view-message-with-message-id msg-id)
-    (add-to-list 'mu4e-view-actions
-                 (cons "apply patch to org" #'org-ml-transient-mu4e-action))))
+    (unless +org-ml-patchy-mood-mode
+      (add-to-list 'mu4e-view-actions
+                   (cons "apply patch to org" #'+org-ml-transient-mu4e-action)))))
 
-(defun org-ml-transient-mu4e-action (msg)
+(defun +org-ml-transient-mu4e-action (msg)
   (setq mu4e-view-actions
-        (delete (cons "apply patch to org" #'org-ml-transient-mu4e-action)
+        (delete (cons "apply patch to org" #'+org-ml-transient-mu4e-action)
                 mu4e-view-actions))
   (+workspace/other)
-  (magit-status org-ml-target-dir)
-  (with-current-buffer (get-buffer-create "*Shell: Org apply patches*")
-    (erase-buffer)
-    (let ((default-directory org-ml-target-dir))
-      (shell-command
-       (format "git am %s"
-               (shell-quote-argument (mu4e-message-field msg :path)))
-       (current-buffer))
-      (magit-refresh))
-    (when (string-match-p "Error\\|failed" (buffer-string))
-      (+popup/buffer))))
+  (magit-status +org-ml-target-dir)
+  (+org-ml-apply-patch msg))
 #+end_src
 *** Packages
 :PROPERTIES:
@@ -5020,7 +5204,7 @@ correct package statement needed.
                     (= 0 (shell-command "cat ~/.ssh/id_ed25519.pub | grep -q AAAAC3NzaC1lZDI1NTE5AAAAIOZZqcJOLdN+QFHKyW8ST2zz750+8TdvO9IT5geXpQVt"))))
       (dev-pkg (let ((default-directory (expand-file-name "straight/repos/org-mode" doom-local-dir)))
                  (and (file-exists-p default-directory)
-                      (string= "git@code.orgmode.org:bzg/org-mode.git\n" (shell-command-to-string "git remote get-url origin")))))
+                      (string= "tec@git.savannah.gnu.org:/srv/git/emacs/org-mode.git\n" (shell-command-to-string "git remote get-url origin")))))
       (recipe-common '(:files ("*.el" "lisp/*.el" "etc")
                        :pre-build
                        (with-temp-file (doom-path (straight--repos-dir "org-mode") "org-version.el")
@@ -5034,7 +5218,7 @@ correct package statement needed.
       :recipe (,@(cond ((and dev-key dev-pkg)
                         (list :host nil :repo nil :local-repo (expand-file-name "straight/repos/org-mode" doom-local-dir)))
                        (dev-key
-                        (list :host nil :repo "git@code.orgmode.org:bzg/org-mode.git"))
+                        (list :host nil :repo "tec@git.savannah.gnu.org:/srv/git/emacs/org-mode.git"))
                        (t
                         (list :host 'github :repo "emacs-straight/org-mode")))
                ,@recipe-common)
@@ -5213,6 +5397,39 @@ to make that right again, and this package makes that even easier to do.
 ;; gdrive export --mime text/plain  1q-cDyKWyM1uzXrjwf0DJbN4LqPesMZo9wURdwkvcFZg
 #+end_src
 
+***** Document comparison
+It's quite nice to compare Org files, and the richest way to compare content is
+probably =latexdiff=. There are a few annoying steps involved here, and so I've
+written a package to streamline the process.
+
+#+begin_src emacs-lisp
+(package! orgdiff :recipe (:local-repo "lisp/orgdiff"))
+#+end_src
+
+The only little annoyance is the fact that =latexdiff= uses ~#FF0000~ and ~#0000FF~ as
+the red/blue change indication colours. We can make this a bit nicer by
+post-processing the =latexdiff= result.
+
+#+begin_src emacs-lisp :tangle yes
+(use-package! orgdiff
+  :defer t
+  :config
+  (defun +orgdiff-nicer-change-colours ()
+    (goto-char (point-min))
+    ;; Set red/blue based on whether chameleon is being used
+    (if (search-forward "%% make document follow Emacs theme" nil t)
+        (setq red  (substring (doom-blend 'red 'fg 0.8) 1)
+              blue (substring (doom-blend 'blue 'teal 0.6) 1))
+      (setq red  "c82829"
+            blue "00618a"))
+    (when (and (search-forward "%DIF PREAMBLE EXTENSION ADDED BY LATEXDIFF" nil t)
+               (search-forward "\\RequirePackage{color}" nil t))
+      (when (re-search-forward "definecolor{red}{rgb}{1,0,0}" (cdr (bounds-of-thing-at-point 'line)) t)
+        (replace-match (format "definecolor{red}{HTML}{%s}" red)))
+      (when (re-search-forward "definecolor{blue}{rgb}{0,0,1}" (cdr (bounds-of-thing-at-point 'line)) t)
+        (replace-match (format "definecolor{blue}{HTML}{%s}" blue)))))
+  (add-to-list 'orgdiff-latexdiff-postprocess-hooks #'+orgdiff-nicer-change-colours))
+#+end_src
 *** Behaviour
 [[xkcd:1319]]
 **** Tweaking defaults
@@ -6817,6 +7034,105 @@ cause issues. Let's make their failure less eventful.
   :around #'org-superstar-mode
   (ignore-errors (apply orig-fn args)))
 #+end_src
+**** Flycheck with org-lint
+
+Org may be simple, but that doesn't mean there's no such thing as malformed Org.
+Thankfully, malformed Org is a much less annoying affair than malformed zipped
+XML (looks at DOCX/ODT...), particularly because there's a rather helpful little
+tool called ~org-lint~ bundled with Org that can tell you about your mistakes.
+
+[[xkcd:2109]]
+
+Flycheck doesn't currently support Org, and there's aren't any packages to do so
+☹. However, in an issue on ~org-lint~ there is [[https://github.com/flycheck/flycheck/issues/1757#issuecomment-759546940][some code]] which apparently works.
+Surely this is what the clipboard was invented for? With that said, let's
+regurgitate the code, cross our fingers, and hope it works.
+
+#+begin_src emacs-lisp
+(defconst flycheck-org-lint-form
+  (flycheck-prepare-emacs-lisp-form
+    (require 'org)
+    (require 'org-attach)
+    (let ((source (car command-line-args-left))
+          (process-default-directory default-directory))
+      (with-temp-buffer
+        (insert-file-contents source 'visit)
+        (setq buffer-file-name source)
+        (setq default-directory process-default-directory)
+        (delay-mode-hooks (org-mode))
+        (setq delayed-mode-hooks nil)
+        (dolist (err (org-lint))
+          (let ((inf (cl-second err)))
+            (princ (elt inf 0))
+            (princ ": ")
+            (princ (elt inf 2))
+            (terpri)))))))
+
+(defconst flycheck-org-lint-variables
+  '(org-directory
+    org-id-locations
+    org-id-locations-file
+    org-attach-id-dir
+    org-attach-use-inheritance
+    org-attach-id-to-path-function-list
+    org-link-parameters)
+  "Variables inherited by the org-lint subprocess.")
+
+(defun flycheck-org-lint-variables-form ()
+  (require 'org-attach)  ; Needed to make variables available
+  `(progn
+     ,@(seq-map (lambda (opt) `(setq-default ,opt ',(symbol-value opt)))
+                (seq-filter #'boundp flycheck-org-lint-variables))))
+
+(flycheck-define-checker org-lint
+  "Org buffer checker using `org-lint'."
+  :command ("emacs" (eval flycheck-emacs-args)
+            "--eval" (eval (concat "(add-to-list 'load-path \""
+                                   (file-name-directory (locate-library "org"))
+                                   "\")"))
+            "--eval" (eval (flycheck-sexp-to-string
+                            (flycheck-org-lint-variables-form)))
+            "--eval" (eval (flycheck-sexp-to-string
+                            (flycheck-org-lint-customisations-form)))
+            "--eval" (eval flycheck-org-lint-form)
+            "--" source)
+  :error-patterns
+  ((error line-start line ": " (message) line-end))
+  :modes org-mode)
+#+end_src
+
+Turns out it almost works. Running =M-x flycheck-verify-setup= after running that
+snippet produces the following:
+#+begin_example
+The following syntax checkers are not registered:
+  - org-lint
+Try adding these syntax checkers to `flycheck-checkers'.
+#+end_example
+
+Well that's very nice and helpful. We'll just do that 🙂.
+#+begin_src emacs-lisp
+(add-to-list 'flycheck-checkers 'org-lint)
+#+end_src
+
+It was missing custom link types, but that's easily fixed just by adding
+~org-link-parameters~ to ~flycheck-org-lint-variables~.
+
+One remaining little annoyance is that it reports extra =#+options= that I've
+added to Org as errors. So we need to tell ~org-lint~ about them without having it
+load my whole config. Code duplication isn't great, but at least this isn't
+much.
+
+#+name: org-syntax-modifications
+#+begin_src emacs-lisp :tangle no
+(defun flycheck-org-lint-customisations-form ()
+  `(progn
+     (require 'ox)
+     (cl-pushnew '(:latex-cover-page nil "coverpage" nil)
+                 (org-export-backend-options (org-export-get-backend 'latex)))
+     (cl-pushnew '(:latex-font-set nil "fontset" nil)
+                 (org-export-backend-options (org-export-get-backend 'latex)))))
+#+end_src
+
 *** Visuals
 
 Here I try to do two things: improve the styling of the various documents, via
@@ -9758,22 +10074,6 @@ This gives the same advantages as mentioned in the [[*Make verbatim different to
         (underline . "\\uline{%s}")
         (verbatim . verb)))
 #+end_src
-**** No AucTeX please
-For some reason, the way that ~org-export-to-file~ works, I find that =latex-mode=
-is called on the produced buffer prior to saving. This has two undesirable
-side-effects:
-+ I get unwanted warnings from AuxTeX
-+ A spurious =.auctex-auto= folder is produced.
-
-There are a few ways I could try to avoid this, but the most obvious to me is
-locally binding ~auto-mode-alist~ to ~nil~.
-#+begin_src emacs-lisp
-(defadvice! no-auto-mode-alist (orig-fn &rest args)
-  "Wrap ORIG-FN in a let-binding that sets `auto-mode-alist' to nil."
-  :around #'org-export-to-file
-  (let ((auto-mode-alist nil))
-    (apply orig-fn args)))
-#+end_src
 **** Check for required packages
 
 For how I've setup Org's LaTeX export, the following packages are needed:
@@ -10451,6 +10751,9 @@ fleshing out. Let's change the prefix to a key which is similarly rarely used,
 but more convenient, like =;=.
 #+begin_src emacs-lisp
 (after! cdlatex
+  (setq cdlatex-env-alist
+        '(("bmatrix" "\\begin{bmatrix}\n?\n\\end{bmatrix}" nil)
+          ("equation*" "\\begin{equation*}\n?\n\\end{equation*}" nil)))
   (setq ;; cdlatex-math-symbol-prefix ?\; ;; doesn't work at the moment :(
    cdlatex-math-symbol-alist
    '( ;; adding missing functions to 3rd level symbols
