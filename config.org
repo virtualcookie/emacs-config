@@ -3790,7 +3790,7 @@ the following configuration
 
 #+begin_src shell :tangle (if (file-exists-p "/usr/share/myspell/en-custom.dic") "no" "setup.sh")
 cd /tmp
-curl -o "hunspell-en-custom.zip" 'http://app.aspell.net/create?max_size=80&spelling=GBs&spelling=AU&max_variant=0&diacritic=keep&special=hacker&special=roman-numerals&encoding=utf-8&format=inline&download=hunspell'
+curl -o "hunspell-en-custom.zip" 'http://app.aspell.net/create?max_size=80&spelling=USs&max_variant=0&diacritic=keep&special=hacker&special=roman-numerals&encoding=utf-8&format=inline&download=hunspell'
 unzip "hunspell-en-custom.zip"
 
 sudo chown root:root en-custom.*
@@ -7410,6 +7410,16 @@ moves the point with ~message-goto-<location>~.
                     (kill-buffer))))))))
 #+end_src
 
+** Org Gcal (Google Calendar)
+Get the GCP client ID & the secret from environment variables
+
+#+begin_src emacs-lisp
+(require 'org-gcal)
+(setq org-gcal-client-id (getenv "ORG_GCAL_CLIENT_ID")
+      org-gcal-client-secret (getenv "ORG_GCAL_CLIENT_SECRET")
+      org-gcal-fetch-file-alist `((,(print (getenv "ORG_GCAL_CAL_ID_1")) . "~/orgfiles/org/cal-gmail.org")
+                                  (,(print (getenv "ORG_GCAL_CAL_ID_2")) . "~/orgfiles/org/cal-family.org")))
+#+end_src
 * Language configuration
 ** General
 *** File Templates
@@ -12535,51 +12545,51 @@ Now, there are some symbols that aren't included in =inputenc=, but we should be
 able to handle anyway. For them we define a table of LaTeX translations
 
 #+name: latex-non-ascii-char-substitutions
-| Character | LaTeX       |
-|-----------+-------------|
-| ɑ         | \(\alpha\)       |
-| β         | \(\beta\)       |
-| γ         | \(\gamma\)       |
-| δ         | \(\delta\)       |
-| ε         | \(\epsilon\)       |
-| ϵ         | \(\varepsilon\)       |
-| ζ         | \(\zeta\)       |
-| η         | \(\eta\)       |
-| θ         | \(\theta\)       |
-| ϑ         | \(\vartheta\)       |
-| ι         | \(\iota\)       |
-| κ         | \(\kappa\)       |
-| λ         | \(\lambda\)       |
-| μ         | \(\mu\)       |
-| ν         | \(\nu\)       |
-| ξ         | \(\xi\)       |
-| π         | \(\pi\)       |
-| ϖ         | \(\varpi\)       |
-| ρ         | \(\rho\)       |
+| Character | LaTeX |
+|-----------+-------|
+| ɑ         | \(\alpha\) |
+| β         | \(\beta\) |
+| γ         | \(\gamma\) |
+| δ         | \(\delta\) |
+| ε         | \(\epsilon\) |
+| ϵ         | \(\varepsilon\) |
+| ζ         | \(\zeta\) |
+| η         | \(\eta\) |
+| θ         | \(\theta\) |
+| ϑ         | \(\vartheta\) |
+| ι         | \(\iota\) |
+| κ         | \(\kappa\) |
+| λ         | \(\lambda\) |
+| μ         | \(\mu\) |
+| ν         | \(\nu\) |
+| ξ         | \(\xi\) |
+| π         | \(\pi\) |
+| ϖ         | \(\varpi\) |
+| ρ         | \(\rho\) |
 | ϱ         | \(\varrho\) |
-| σ         | \(\sigma\)       |
-| ς         | \(\varsigma\)       |
-| τ         | \(\tau\)       |
-| υ         | \(\upsilon\)       |
-| ϕ         | \(\phi\)       |
-| φ         | \(\varphi\)       |
-| ψ         | \(\psi\)       |
-| ω         | \(\omega\)       |
-| Γ         | \(\Gamma\)       |
-| Δ         | \(\Delta\)       |
-| Θ         | \(\Theta\)       |
-| Λ         | \(\Lambda\)       |
-| Ξ         | \(\Xi\)       |
-| Π         | \(\Pi\)       |
-| Σ         | \(\Sigma\)       |
-| Υ         | \(\Upsilon\)       |
-| Φ         | \(\Phi\)       |
-| Ψ         | \(\Psi\)       |
-| Ω         | \(\Omega\)       |
-| א         | \(\aleph\)       |
-| ב         | \(\beth\)       |
+| σ         | \(\sigma\) |
+| ς         | \(\varsigma\) |
+| τ         | \(\tau\) |
+| υ         | \(\upsilon\) |
+| ϕ         | \(\phi\) |
+| φ         | \(\varphi\) |
+| ψ         | \(\psi\) |
+| ω         | \(\omega\) |
+| Γ         | \(\Gamma\) |
+| Δ         | \(\Delta\) |
+| Θ         | \(\Theta\) |
+| Λ         | \(\Lambda\) |
+| Ξ         | \(\Xi\) |
+| Π         | \(\Pi\) |
+| Σ         | \(\Sigma\) |
+| Υ         | \(\Upsilon\) |
+| Φ         | \(\Phi\) |
+| Ψ         | \(\Psi\) |
+| Ω         | \(\Omega\) |
+| א         | \(\aleph\) |
+| ב         | \(\beth\) |
 | ד         | \(\daleth\) |
-| ג         | \(\gimel\)       |
+| ג         | \(\gimel\) |
 
 #+name: gen-latex-non-ascii-char-substitutions
 #+begin_src emacs-lisp :noweb-ref none :var latex-non-ascii-char-substitutions=latex-non-ascii-char-substitutions
