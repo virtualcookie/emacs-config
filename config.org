@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2020-2021 tecosaur <tec@tecosaur.com>
+# SPDX-License-Identifier: MIT
 #+title: Doom Emacs Configuration
 #+subtitle: The Methods, Management, and Menagerie@@latex:\\@@ of Madness@@latex: --- in meticulous detail@@
 #+author: tecosaur
@@ -16,11 +18,16 @@
 #+begin_export html
 <a href="https://github.com/tecosaur/emacs-config/"
    style="font-family: 'Open Sans'; background-image: none; color: inherit;
-   text-decoration: none; position: relative; top: clamp(-26px, calc(1280px - 100vw), 0px); opacity: 0.7;">
+          text-decoration: none; position: relative; top: clamp(-26px, calc(1280px - 100vw), 0px); opacity: 0.7;">
   <img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg"
        class="invertible" alt="GitHub Octicon"
        style="height: 1em; position: relative; top: 0.1em;">
-  View on GitHub</a>
+  View on GitHub</a>&ensp;
+<a href="https://www.buymeacoffee.com/tecosaur"
+   style="position: relative;top: clamp(-22px, calc(1280px - 100vw), 0px);">
+  <img src="https://img.shields.io/badge/Buy_me_a%C2%A0coffee-FFDD00?style=flat-square&amp;logo=buy-me-a-coffee&amp;logoColor=black"
+       class="invertible" alt="Buy me a coffee"
+       style="border-radius: 4px; opacity: 0.85;"></a>
 #+end_export
 
 #+begin_quote
@@ -271,15 +278,6 @@ few extras.
   - It's slightly quirky. Look at the diagonal cut on stems for example.
     Helvetica is a masterful design, but I like a bit more pizzazz now and then.
 + A few LSP servers. Take a look at [[file:init.el][init.el]] to see which modules have the ~+lsp~ flag.
-+ The [[https://github.com/dandavison/delta/][Delta]] binary. It's packaged for some distributions but I installed it with
-  #+begin_src shell :eval no :tangle (if (executable-find "delta") "no" "setup.sh")
-cargo install git-delta
-  #+end_src
-+ The =theme-magic= package requires the ~wal~ (=pywal=) executable. If this is
-  packaged for you, great! If not, it's just a quick ~pip install~ away.
-  #+begin_src shell :eval no :tangle (if (executable-find "wal") "no" "setup.sh")
-sudo python3 -m pip install pywal
-  #+end_src
 
 ** Current Issues
 *** Magit push in daemon
@@ -981,15 +979,63 @@ Doom adds an =org-mode= hook ~+literate-enable-recompile-h~. This is a nice idea
 but it's too blocking for my taste. Since I trust my tangling to be fairly
 straightforward, I'll just redefine it to a simpler, async, function.
 #+begin_src emacs-lisp
+(defvar +literate-tangle--proc nil)
+(defvar +literate-tangle--proc-start-time nil)
+
 (defadvice! +literate-tangle-async-h ()
   "A very simplified version of `+literate-tangle-h', but async."
   :override #'+literate-tangle-h
-  (let ((default-directory doom-private-dir))
-    (async-shell-command
-     (format "emacs --batch --eval \"(progn \
-(require 'org) (setq org-confirm-babel-evaluate nil) \
-(org-babel-tangle-file \\\"%s\\\"))\""
-             +literate-config-file))))
+  (unless (getenv "__NOTANGLE")
+    (let ((default-directory doom-private-dir))
+      (when +literate-tangle--proc
+        (message "Killing outdated tangle process...")
+        (set-process-sentinel +literate-tangle--proc #'ignore)
+        (kill-process +literate-tangle--proc)
+        (sit-for 0.3)) ; ensure the message is seen for a bit
+      (setq +literate-tangle--proc-start-time (float-time)
+            +literate-tangle--proc
+            (start-process "tangle-config"
+                           (get-buffer-create " *tangle config*")
+                           "emacs" "--batch" "--eval"
+                           (format "(progn \
+(require 'ox) \
+(require 'ob-tangle) \
+(setq org-confirm-babel-evaluate nil \
+      org-inhibit-startup t \
+      org-mode-hook nil \
+      write-file-functions nil \
+      before-save-hook nil \
+      after-save-hook nil \
+      vc-handled-backends nil \
+      org-startup-folded nil \
+      org-startup-indented nil) \
+(org-babel-tangle-file \"%s\" \"%s\"))"
+                                   +literate-config-file
+                                   (expand-file-name (concat doom-module-config-file ".el")))))
+      (set-process-sentinel +literate-tangle--proc #'+literate-tangle--sentinel)
+      (run-at-time nil nil (lambda () (message "Tangling config.org"))) ; ensure shown after a save message
+      "Tangling config.org...")))
+
+(defun +literate-tangle--sentinel (process signal)
+  (cond
+   ((and (eq 'exit (process-status process))
+         (= 0 (process-exit-status process)))
+    (message "Tangled config.org sucessfully (took %.1fs)"
+             (- (float-time) +literate-tangle--proc-start-time))
+    (setq +literate-tangle--proc nil))
+   ((memq (process-status process) (list 'exit 'signal))
+    (+popup-buffer (get-buffer " *tangle config*"))
+    (message "Failed to tangle config.org (after %.1fs)"
+             (- (float-time) +literate-tangle--proc-start-time))
+    (setq +literate-tangle--proc nil))))
+
+(defun +literate-tangle-check-finished ()
+  (when (and (process-live-p +literate-tangle--proc)
+             (yes-or-no-p "Config is currently retangling, would you please wait a few seconds?"))
+    (switch-to-buffer " *tangle config*")
+    (signal 'quit nil)))
+(add-hook! 'kill-emacs-hook #'+literate-tangle-check-finished)
+#+end_src
 #+end_src
 *** Dashboard quick actions
 
@@ -1005,7 +1051,8 @@ of unnecessary keystrokes --- we can simply bind common actions to a single key!
       :ne "c" (cmd! (find-file (expand-file-name "config.org" doom-private-dir)))
       :ne "." (cmd! (doom-project-find-file "~/.config/")) ; . for dotfiles
       :ne "b" #'+vertico/switch-workspace-buffer
-      :ne "B" #'consult-buffer)
+      :ne "B" #'consult-buffer
+      :ne "q" #'save-buffers-kill-terminal)
 #+end_src
 
 ** Other things
@@ -1150,75 +1197,81 @@ The following is rather long, but it essentially
 + re-uses the last phrase for requests within a few seconds of it being fetched
 
 #+begin_src emacs-lisp
-(defvar phrase-api-url
-  (nth (random 3)
-       '(("https://corporatebs-generator.sameerkumar.website/" :phrase)
-         ("https://useless-facts.sameerkumar.website/api" :data)
-         ("https://dev-excuses-api.herokuapp.com/" :text))))
+(defvar splash-phrase-source-folder
+  (expand-file-name "misc/splash-phrases" doom-private-dir)
+  "A folder of text files with a fun phrase on each line.")
 
-(defmacro phrase-generate-callback (token &optional format-fn ignore-read-only callback buffer-name)
-  `(lambda (status)
-     (unless (plist-get status :error)
-       (goto-char url-http-end-of-headers)
-       (let ((phrase (plist-get (json-parse-buffer :object-type 'plist) (cadr phrase-api-url)))
-             (inhibit-read-only ,(when (eval ignore-read-only) t)))
-         (setq phrase-last (cons phrase (float-time)))
-         (with-current-buffer ,(or (eval buffer-name) (buffer-name (current-buffer)))
-           (save-excursion
-             (goto-char (point-min))
-             (when (search-forward ,token nil t)
-               (with-silent-modifications
-                 (replace-match "")
-                 (insert ,(if format-fn format-fn 'phrase)))))
-           ,callback)))))
+(defvar splash-phrase-sources
+  (let* ((files (directory-files splash-phrase-source-folder nil "\\.txt\\'"))
+         (sets (delete-dups (mapcar
+                             (lambda (file)
+                               (replace-regexp-in-string "\\(?:-[0-9]+-\\w+\\)?\\.txt" "" file))
+                             files))))
+    (mapcar (lambda (sset)
+              (cons sset
+                    (delq nil (mapcar
+                               (lambda (file)
+                                 (when (string-match-p (regexp-quote sset) file)
+                                   file))
+                               files))))
+            sets))
+  "A list of cons giving the phrase set name, and a list of files which contain phrase components.")
 
-(defvar phrase-last nil)
-(defvar phrase-timeout 5)
+(defvar splash-phrase-set
+  (nth (random (length splash-phrase-sources)) (mapcar #'car splash-phrase-sources))
+  "The default phrase set. See `splash-phrase-sources'.")
 
-(defmacro phrase-insert-async (&optional format-fn token ignore-read-only callback buffer-name)
-  `(let ((inhibit-message t))
-     (if (and phrase-last
-              (> phrase-timeout (- (float-time) (cdr phrase-last))))
-         (let ((phrase (car phrase-last)))
-           ,(if format-fn format-fn 'phrase))
-       (url-retrieve (car phrase-api-url)
-                     (phrase-generate-callback ,(or token "\ufeff") ,format-fn ,ignore-read-only ,callback ,buffer-name))
-       ;; For reference, \ufeff = Zero-width no-break space / BOM
-       ,(or token "\ufeff"))))
+(defun splase-phrase-set-random-set ()
+  "Set a new random splash phrase set."
+  (interactive)
+  (setq splash-phrase-set
+        (nth (random (1- (length splash-phrase-sources)))
+             (cl-set-difference (mapcar #'car splash-phrase-sources) (list splash-phrase-set))))
+  (+doom-dashboard-reload t))
+
+(defvar splase-phrase--cache nil)
+
+(defun splash-phrase-get-from-file (file)
+  "Fetch a random line from FILE."
+  (let ((lines (or (cdr (assoc file splase-phrase--cache))
+                   (cdar (push (cons file
+                                     (with-temp-buffer
+                                       (insert-file-contents (expand-file-name file splash-phrase-source-folder))
+                                       (split-string (string-trim (buffer-string)) "\n")))
+                               splase-phrase--cache)))))
+    (nth (random (length lines)) lines)))
+
+(defun splash-phrase (&optional set)
+  "Construct a splash phrase from SET. See `splash-phrase-sources'."
+  (mapconcat
+   #'splash-phrase-get-from-file
+   (cdr (assoc (or set splash-phrase-set) splash-phrase-sources))
+   " "))
 
 (defun doom-dashboard-phrase ()
-  (phrase-insert-async
-   (progn
-     (setq-local phrase-position (point))
-     (mapconcat
-      (lambda (line)
-        (+doom-dashboard--center
-         +doom-dashboard--width
-         (with-temp-buffer
-           (insert-text-button
-            line
-            'action
-            (lambda (_)
-              (setq phrase-last nil)
-              (+doom-dashboard-reload t))
-            'face 'doom-dashboard-menu-title
-            'mouse-face 'doom-dashboard-menu-title
-            'help-echo "Random phrase"
-            'follow-link t)
-           (buffer-string))))
-      (split-string
-       (with-temp-buffer
-         (insert phrase)
-         (setq fill-column (min 70 (/ (* 2 (window-width)) 3)))
-         (fill-region (point-min) (point-max))
-         (buffer-string))
-       "\n")
-      "\n"))
-   nil t
-   (progn
-     (goto-char phrase-position)
-     (forward-whitespace 1))
-   +doom-dashboard-name))
+  "Get a splash phrase, flow it over multiple lines as needed, and make fontify it."
+  (mapconcat
+   (lambda (line)
+     (+doom-dashboard--center
+      +doom-dashboard--width
+      (with-temp-buffer
+        (insert-text-button
+         line
+         'action
+         (lambda (_) (+doom-dashboard-reload t))
+         'face 'doom-dashboard-menu-title
+         'mouse-face 'doom-dashboard-menu-title
+         'help-echo "Random phrase"
+         'follow-link t)
+        (buffer-string))))
+   (split-string
+    (with-temp-buffer
+      (insert (splash-phrase))
+      (setq fill-column (min 70 (/ (* 2 (window-width)) 3)))
+      (fill-region (point-min) (point-max))
+      (buffer-string))
+    "\n")
+   "\n"))
 
 (defadvice! doom-dashboard-widget-loaded-with-phrase ()
   :override #'doom-dashboard-widget-loaded
@@ -1475,19 +1528,7 @@ anything to be run.
   (message ";; setup.sh did not exist during tangle. Tangle again.")
   (pp-to-string
    `(unless noninteractive
-      (add-hook! 'doom-init-ui-hook
-        (let ((default-directory doom-private-dir))
-          (setq tangle-proc (start-process "tangle-config" (get-buffer-create " *tangle config*")
-                                           "emacs" "--batch" "--eval"
-                                           (format "(progn \
-(require 'org) \
-(setq org-confirm-babel-evaluate nil) \
-(org-babel-tangle-file \"%s\"))" +literate-config-file)))
-          (add-hook! 'kill-emacs-hook
-            (when (and (process-live-p tangle-proc)
-                       (yes-or-no-p "Config is currently retangling, would you please wait a few seconds?"))
-              (switch-to-buffer " *tangle config*")
-              (signal 'quit nil))))))))
+      (add-hook! 'doom-init-ui-hook #'+literate-tangle-async-h))))
 #+end_src
 
 #+begin_src emacs-lisp :noweb no-export
@@ -1719,23 +1760,31 @@ From the =:tools magit= module.
 
 [[xkcd:1597]]
 
-Magit is absolutely great by default. The diffs don't get any
-syntax-highlighting-love though which is a bit sad. Thankfully
-[[https://github.com/dandavison/magit-delta][dandavison/magit-delta]] exists, which we can put to use.
-#+begin_src emacs-lisp
-;; (after! magit
-;;   (magit-delta-mode +1))
-#+end_src
-Unfortunately this seems to mess things up, which is something I'll want to look
-into later.
+Magit is great as-is, thanks for making such a lovely package [[https://github.com/tarsius][Jonas]]!
 
 *** Magit delta
 
 [[https://github.com/dandavison/delta/][Delta]] is a git diff syntax highlighter written in rust. The author also wrote a
-package to hook this into the magit diff view. This requires the ~delta~ binary.
+package to hook this into the magit diff view (which don't get any syntax
+highlighting by default). This requires the ~delta~ binary. It's packaged on some
+distributions, but most reliably installed through Rust's package manager cargo.
+
+#+begin_src shell :eval no :tangle (if (or (not (executable-find "cargo")) (executable-find "delta")) "no" "setup.sh")
+cargo install git-delta
+#+end_src
+
+Now we can make use of the package for this.
 #+begin_src emacs-lisp :tangle packages.el
 ;; (package! magit-delta :recipe (:host github :repo "dandavison/magit-delta") :pin "56cdffd377279589aa0cb1df99455c098f1848cf")
 #+end_src
+
+All that's left is to hook it into magit
+#+begin_src emacs-lisp
+;; (after! magit
+;;   (magit-delta-mode +1))
+#+end_src
+Unfortunately this currently seems to mess things up, which is something I'll
+want to look into later.
 
 *** Smerge
 
@@ -1915,7 +1964,7 @@ That's no problem though, we just need to help TRAMP find them.
 Sometimes pressing =TAB= is just too much.
 #+begin_src emacs-lisp :tangle packages.el
 (package! aas :recipe (:host github :repo "ymarco/auto-activating-snippets")
-  :pin "118ed7fc948b6d91eea727df35a1639521bf5fdb")
+  :pin "1699bec4d244a1f62af29fe4eb8b79b6d2fccf7d")
 #+end_src
 
 #+begin_src emacs-lisp
@@ -1972,7 +2021,7 @@ Nested snippets are good, so let's enable that.
 
 For when you want to change the case pattern for a symbol.
 #+begin_src emacs-lisp :tangle packages.el
-(package! string-inflection :pin "c4a519be102cb99dd86be3ee8c387f008d097635")
+(package! string-inflection :pin "fd7926ac17293e9124b31f706a4e8f38f6a9b855")
 #+end_src
 
 #+begin_src emacs-lisp
@@ -2048,7 +2097,7 @@ welcomed into Emacs 28. However, he is also rather attentive with updates, and
 so I'd like to make sure we have a recent version.
 
 #+begin_src emacs-lisp :tangle packages.el
-(package! modus-themes :pin "52532a1ac2f3b707e79ba67ada8bf36846e45048")
+(package! modus-themes :pin "392ebb115b07f8052d512ec847619387d109edd6")
 #+end_src
 
 *** Theme magic
@@ -2056,6 +2105,12 @@ so I'd like to make sure we have a recent version.
 With all our fancy Emacs themes, my terminal is missing out!
 #+begin_src emacs-lisp :tangle packages.el
 (package! theme-magic :pin "844c4311bd26ebafd4b6a1d72ddcc65d87f074e3")
+#+end_src
+
+This operates using =pywal=, which is present in some repositories, but most
+reliably installed with =pip=.
+#+begin_src shell :eval no :tangle (if (executable-find "wal") "no" "setup.sh")
+sudo python3 -m pip install pywal
 #+end_src
 
 Theme magic takes a look at a number of faces, the saturation levels, and colour
@@ -3443,7 +3498,7 @@ Using [[https://gitlab.com/shackra/goimapnotify][goimapnotify]] we should be abl
 mail. Unfortunately this means /yet another/ config file :(
 
 We install with
-#+begin_src shell :eval no :tangle (if (executable-find "goimapnotify") "no" "setup.sh")
+#+begin_src shell :eval no :tangle (if (or (not (executable-find "mu")) (executable-find "goimapnotify")) "no" "setup.sh")
 go get -u gitlab.com/shackra/goimapnotify
 ln -s ~/.local/share/go/bin/goimapnotify ~/.local/bin/
 #+end_src
@@ -3522,7 +3577,7 @@ Prevents a series of redisplays from being called (when set to an appropriate va
 
 **** Config transcoding & service management
 As long as the =mbsyncrc= file exists, this is as easy as running
-#+begin_src shell :tangle (if (file-exists-p "~/.config/imapnotify") "no" "setup.sh")
+#+begin_src shell :tangle (if (or (not (executable-find "mu")) (file-exists-p "~/.config/imapnotify")) "no" "setup.sh")
 ~/.config/doom/misc/mbsync-imapnotify.py
 #+end_src
 
@@ -3926,7 +3981,7 @@ start, so for that I'll do the 'normal' thing and run ~mbsync -all~ every so oft
 --- let's say five minutes.
 
 We can accomplish this via a systemd timer, and service file.
-#+begin_src systemd :tangle ~/.config/systemd/user/mbsync.timer
+#+begin_src systemd :tangle (if (executable-find "mu") "~/.config/systemd/user/mbsync.timer" "no")
 [Unit]
 Description=call mbsync on all accounts every 5 minutes
 ConditionPathExists=%h/.mbsyncrc
@@ -3939,7 +3994,7 @@ OnUnitInactiveSec=5m
 WantedBy=default.target
 #+end_src
 
-#+begin_src systemd :tangle ~/.config/systemd/user/mbsync.service
+#+begin_src systemd :tangle (if (executable-find "mu") "~/.config/systemd/user/mbsync.service" "no")
 [Unit]
 Description=mbsync service, sync all mail
 Documentation=man:mbsync(1)
@@ -3954,7 +4009,7 @@ WantedBy=mail.target
 #+end_src
 
 Enabling (and starting) this is as simple as
-#+begin_src shell :tangle (if (string= "enabled\n" (shell-command-to-string "systemctl --user is-enabled mbsync.timer")) "no" "setup.sh")
+#+begin_src shell :tangle (if (or (not (executable-find "mu")) (string= "enabled\n" (shell-command-to-string "systemctl --user is-enabled mbsync.timer"))) "no" "setup.sh")
 systemctl --user enable mbsync.timer --now
 #+end_src
 *** Indexing/Searching
@@ -4178,7 +4233,7 @@ StartupWMClass=Emacs
 #+end_src
 
 To register this, just call
-#+begin_src shell :tangle (if (string= (shell-command-to-string "xdg-mime query default x-scheme-handler/mailto") "emacsmail.desktop\n") "no" "setup.sh")
+#+begin_src shell :tangle (if (or (not (executable-find "mu")) (string= (shell-command-to-string "xdg-mime query default x-scheme-handler/mailto") "emacsmail.desktop\n")) "no" "setup.sh")
 update-desktop-database ~/.local/share/applications
 #+end_src
 
@@ -4187,7 +4242,7 @@ We also want to define ~mu4e-compose-from-mailto~.
 (defun mu4e-compose-from-mailto (mailto-string &optional quit-frame-after)
   (require 'mu4e)
   (unless mu4e~server-props (mu4e t) (sleep-for 0.1))
-  (let* ((mailto (rfc2368-parse-mailto-url mailto-string))
+  (let* ((mailto (message-parse-mailto-url mailto-string))
          (to (cdr (assoc "To" mailto)))
          (subject (or (cdr (assoc "Subject" mailto)) ""))
          (body (cdr (assoc "Body" mailto)))
@@ -4232,7 +4287,8 @@ We can also use this a signature,
 #+begin_src emacs-lisp
 (setq message-signature mu4e-from-name)
 #+end_src
-**** Adding =X-Woof= headers
+**** Working with the Org mailing list
+***** Adding =X-Woof= headers
 
 I'm fairly active on the Org mailing list (ML). The Org ML has a linked
 bug/patch tracker, https://updates.orgmode.org/ managed by [[https://github.com/bzg/woof][Woof]]. However, I feel
@@ -4257,7 +4313,7 @@ header.
                   (propertize "Patch" 'face 'outline-3)
                   (propertize "p" 'face '(bold consult-key))
                   (propertize "a" 'face '(bold consult-key))
-                  (propertize "A" 'face '(bold consult-key))
+                  (propertize "c" 'face '(bold consult-key))
                   (propertize "Bug" 'face 'outline-3)
                   (propertize "b" 'face '(bold consult-key))
                   (propertize "f" 'face '(bold consult-key))
@@ -4267,11 +4323,11 @@ header.
                   (propertize "x" 'face '(bold error))))
     (?p "X-Woof-Patch: confirmed")
     (?a "X-Woof-Patch: applied")
-    (?A "X-Woof-Patch: canceled")
+    (?c "X-Woof-Patch: cancelled")
     (?b "X-Woof-Bug: confirmed")
     (?f "X-Woof-Bug: fixed")
-    (?r "X-Woof-Help: confirmed")
-    (?r "X-Woof-Help: canceled")
+    (?h "X-Woof-Help: confirmed")
+    (?r "X-Woof-Help: cancelled")
     (?x 'delete)))
 #+end_src
 
@@ -4302,6 +4358,121 @@ Now we just need a function which will add such a header to a buffer
 #+end_src
 
 Lovely! That should make adding these headers a breeze.
+
+***** Patch workflow
+
+Testing patches from the ML is currently more hassle than it needs to be. Let's
+change that.
+
+#+begin_src emacs-lisp
+(after! mu4e
+  (defvar +org-ml-target-dir "~/.emacs.d/.local/straight/repos/org-mode/")
+  (defvar +org-ml-max-age 600
+    "Maximum permissible age in seconds.")
+  (defvar +org-ml--cache-timestamp 0)
+  (defvar +org-ml--cache nil)
+
+  (define-minor-mode +org-ml-patchy-mood-mode
+    "Apply patches to Org in bulk."
+    :global t
+    (let ((action (cons "apply patch to org" #'+org-ml-apply-patch)))
+      (if +org-ml-patchy-mood-mode
+          (add-to-list 'mu4e-view-actions action)
+        (setq mu4e-view-actions (delete action mu4e-view-actions)))))
+
+  (defun +org-ml-apply-patch (msg)
+    "Apply the patch in the current message to Org."
+    (interactive)
+    (unless msg (setq msg (mu4e-message-at-point)))
+    (with-current-buffer (get-buffer-create "*Shell: Org apply patches*")
+      (erase-buffer)
+      (let* ((default-directory +org-ml-target-dir)
+             (exit-code (call-process "git" nil t nil "am" (mu4e-message-field msg :path))))
+        (magit-refresh)
+        (when (not (= 0 exit-code))
+          (+popup/buffer)))))
+
+  (defun +org-ml-current-patches ()
+    "Get the currently open patches, as a list of alists.
+Entries of the form (subject . id)."
+    (delq nil
+          (mapcar
+           (lambda (entry)
+             (unless (plist-get entry :fixed)
+               (cons
+                (format "%-8s  %s"
+                        (propertize
+                         (replace-regexp-in-string "T.*" ""
+                                                   (plist-get entry :date))
+                         'face 'font-lock-doc-face)
+                        (propertize
+                         (replace-regexp-in-string "\\[PATCH\\] ?" ""
+                                                   (plist-get entry :summary))
+                         'face 'font-lock-keyword-face))
+                (plist-get entry :id))))
+           (with-current-buffer (url-retrieve-synchronously "https://updates.orgmode.org/data/patches")
+             (goto-char url-http-end-of-headers)
+             (json-parse-buffer :object-type 'plist)))))
+
+  (defun +org-ml-select-patch-thread ()
+    "Find and apply a proposed Org patch."
+    (interactive)
+    (let* ((current-workspace (+workspace-current))
+           (patches (progn
+                      (when (or (not +org-ml--cache)
+                                (> (- (float-time) +org-ml--cache-timestamp)
+                                   +org-ml-max-age))
+                        (setq +org-ml--cache (+org-ml-current-patches)
+                              +org-ml--cache-timestamp (float-time)))
+                      +org-ml--cache))
+           (msg-id (cdr (assoc (completing-read
+                                "Thread: " (mapcar #'car patches))
+                               patches))))
+      (+workspace-switch +mu4e-workspace-name)
+      (mu4e-view-message-with-message-id msg-id)
+      (unless +org-ml-patchy-mood-mode
+        (add-to-list 'mu4e-view-actions
+                     (cons "apply patch to org" #'+org-ml-transient-mu4e-action)))))
+
+  (defun +org-ml-transient-mu4e-action (msg)
+    (setq mu4e-view-actions
+          (delete (cons "apply patch to org" #'+org-ml-transient-mu4e-action)
+                  mu4e-view-actions))
+    (+workspace/other)
+    (magit-status +org-ml-target-dir)
+    (+org-ml-apply-patch msg)))
+#+end_src
+
+***** Mail list archive links
+
+The other thing which it's good to be easily able to do is grab a link to the
+current message on https://list.orgmode.org.
+
+#+begin_src emacs-lisp
+(after! mu4e
+  (defun +mu4e-ml-message-link (msg)
+    "Copy the link to MSG on the mailing list archives."
+    (let* ((list-addr (or (mu4e-message-field msg :mailing-list)
+                          (cdar (mu4e-message-field-raw msg :list-post))
+                          (thread-last (append (mu4e-message-field msg :to)
+                                               (mu4e-message-field msg :cc))
+                            (mapcar #'last)
+                            (mapcar #'cdr)
+                            (mapcar (lambda (addr)
+                                      (when (string-match-p "emacs.*@gnu\\.org$" addr)
+                                        (replace-regexp-in-string "@" "." addr))))
+                            (delq nil)
+                            (car))))
+           (msg-url
+            (cond
+             ((string= "emacs-orgmode.gnu.org" list-addr)
+              (format "https://list.orgmode.org/%s" (mu4e-message-field msg :message-id)))
+             (t (user-error "Mailing list %s not supported" list-addr)))))
+      (message "Link %s copied to clipboard" (gui-select-text msg-url))
+      msg-url))
+
+  (add-to-list 'mu4e-view-actions (cons "link to message ML" #'+mu4e-ml-message-link) t))
+#+end_src
 
 *** Org Msg
 Doom does a fantastic stuff with the defaults with this, so we only make a few
@@ -4478,85 +4649,6 @@ Then adding a regex for it to =~/.config/git/config=
   xfuncname = "^(\\*+ +.*)$"
 #+end_src
 
-**** Development
-Testing patches from the ML is currently more hassle than it needs to be. Let's
-change that.
-#+begin_src emacs-lisp
-(defvar +org-ml-target-dir "~/.emacs.d/.local/straight/repos/org-mode/")
-(defvar +org-ml-max-age 600
-  "Maximum permissible age in seconds.")
-(defvar +org-ml--cache-timestamp 0)
-(defvar +org-ml--cache nil)
-
-(define-minor-mode +org-ml-patchy-mood-mode
-  "Apply patches to Org in bulk."
-  :global t
-  (let ((action (cons "apply patch to org" #'+org-ml-apply-patch)))
-    (if +org-ml-patchy-mood-mode
-        (add-to-list 'mu4e-view-actions action)
-      (setq mu4e-view-actions (delete action mu4e-view-actions)))))
-
-(defun +org-ml-apply-patch (msg)
-  "Apply the patch in the current message to Org."
-  (interactive)
-  (unless msg (setq msg (mu4e-message-at-point)))
-  (with-current-buffer (get-buffer-create "*Shell: Org apply patches*")
-    (erase-buffer)
-    (let* ((default-directory +org-ml-target-dir)
-           (exit-code (call-process "git" nil t nil "am" (mu4e-message-field msg :path))))
-      (magit-refresh)
-      (when (not (= 0 exit-code))
-        (+popup/buffer)))))
-
-(defun +org-ml-current-patches ()
-  "Get the currently open patches, as a list of alists.
-Entries of the form (subject . id)."
-  (delq nil
-        (mapcar
-         (lambda (entry)
-           (unless (plist-get entry :fixed)
-             (cons
-              (format "%-8s  %s"
-                      (propertize
-                       (replace-regexp-in-string "T.*" ""
-                                                 (plist-get entry :date))
-                       'face 'font-lock-doc-face)
-                      (propertize
-                       (replace-regexp-in-string "\\[PATCH\\] ?" ""
-                                                 (plist-get entry :summary))
-                       'face 'font-lock-keyword-face))
-              (plist-get entry :id))))
-         (with-current-buffer (url-retrieve-synchronously "https://updates.orgmode.org/data/patches")
-           (json-parse-buffer :object-type 'plist)))))
-
-(defun +org-ml-select-patch-thread ()
-  "Find and apply a proposed Org patch."
-  (interactive)
-  (let* ((current-workspace (+workspace-current))
-         (patches (progn
-                    (when (or (not +org-ml--cache)
-                              (> (- (float-time) +org-ml--cache-timestamp)
-                                 +org-ml-max-age))
-                      (setq +org-ml--cache (+org-ml-current-patches)
-                            +org-ml--cache-timestamp (float-time)))
-                    +org-ml--cache))
-         (msg-id (cdr (assoc (completing-read
-                              "Thread: " (mapcar #'car patches))
-                             patches))))
-    (+workspace-switch +mu4e-workspace-name)
-    (mu4e-view-message-with-message-id msg-id)
-    (unless +org-ml-patchy-mood-mode
-      (add-to-list 'mu4e-view-actions
-                   (cons "apply patch to org" #'+org-ml-transient-mu4e-action)))))
-
-(defun +org-ml-transient-mu4e-action (msg)
-  (setq mu4e-view-actions
-        (delete (cons "apply patch to org" #'+org-ml-transient-mu4e-action)
-                mu4e-view-actions))
-  (+workspace/other)
-  (magit-status +org-ml-target-dir)
-  (+org-ml-apply-patch msg))
-#+end_src
 *** Packages
 :PROPERTIES:
 :header-args:emacs-lisp: :tangle packages.el :comments no
@@ -4609,7 +4701,7 @@ correct package statement needed.
 (package! org-contrib
   :recipe (:host nil :repo "https://git.sr.ht/~bzg/org-contrib"
            :files ("lisp/*.el"))
-  :pin "fc81309cf6756607a836f93049a9393c2967c4e0")
+  :pin "b8012e759bd5bf5da802b0b41734a8fec218323c")
 #+end_src
 
 **** Visuals
@@ -4944,9 +5036,9 @@ There's also the new =org-cite= though. It would be nice to try that out.
 To improve =org-cite=.
 
 #+begin_src emacs-lisp :noweb-ref none :tangle packages.el
-(package! citeproc :pin "299e52b2dda37960d609efa78c40e255001d163a")
-(package! bibtex-completion :pin "12079bb09f203dda5cc2dd003bd60a6ad490f762")
-(package! bibtex-actions :pin "0e825fafe4f5843f9af4aed0bff8cc393fcae9f2")
+(package! bibtex-actions :pin "8130de52d9bf246d56bda0299ffea08108f0463b")
+(package! citeproc :pin "91d7630de1ec61ff5d5e62c27d820207ec5bb1c6")
+(package! bibtex-completion :pin "bb47f355b0da8518aa3fb516019120c14c8747c9")
 (package! org-cite-csl-activate :recipe (:host github :repo "andras-simonyi/org-cite-csl-activate") :pin "032e765a4cf634fc56abcd18488510d3d5b1ee09")
 #+end_src
 
@@ -5010,11 +5102,15 @@ To improve =org-cite=.
     (interactive)
     (setq org-cite-activate-processor 'csl-activate)
     (add-hook! 'org-mode-hook '((lambda () (cursor-sensor-mode 1)) org-cite-csl-activate-render-all))
+    (defadvice! +org-cite-csl-activate-render-all-silent (orig-fn)
+      :around #'org-cite-csl-activate-render-all
+      (with-silent-modifications (funcall orig-fn)))
     (when (eq major-mode 'org-mode)
-      (save-excursion
-        (goto-char (point-min))
-        (org-cite-activate (point-max)))
-      (org-cite-csl-activate-render-all))))
+      (with-silent-modifications
+        (save-excursion
+          (goto-char (point-min))
+          (org-cite-activate (point-max)))
+        (org-cite-csl-activate-render-all)))))
 
 (use-package! oc-bibtex-actions
   :when (featurep! :completion vertico)
@@ -5282,8 +5378,7 @@ set up org-capture.
                    :headline "Inbox"
                    :type entry
                    :template ("* TODO %?"
-                              "%i %a")
-                   )
+                              "%i %a"))
                   ("Personal note" :keys "n"
                    :icon ("sticky-note-o" :set "faicon" :color "green")
                    :file +org-capture-todo-file
@@ -5313,8 +5408,7 @@ set up org-capture.
                    :children (("Webpage" :keys "w"
                                :icon ("globe" :set "faicon" :color "green")
                                :desc "%(org-cliplink-capture) "
-                               :i-type "read:web"
-                               )
+                               :i-type "read:web")
                               ("Article" :keys "a"
                                :icon ("file-text" :set "octicon" :color "yellow")
                                :desc ""
@@ -5324,18 +5418,15 @@ set up org-capture.
                                :icon ("spoon" :set "faicon" :color "dorange")
                                :file +org-capture-recipies
                                :headline "Unsorted"
-                               :template "%(org-chef-get-recipe-from-url)"
-                               )
+                               :template "%(org-chef-get-recipe-from-url)")
                               ("Information" :keys "i"
                                :icon ("info-circle" :set "faicon" :color "blue")
                                :desc ""
-                               :i-type "read:info"
-                               )
+                               :i-type "read:info")
                               ("Idea" :keys "I"
                                :icon ("bubble_chart" :set "material" :color "silver")
                                :desc ""
-                               :i-type "idea"
-                               )))
+                               :i-type "idea")))
                   ("Tasks" :keys "k"
                    :icon ("inbox" :set "octicon" :color "yellow")
                    :file +org-capture-todo-file
@@ -5346,17 +5437,13 @@ set up org-capture.
                               "%i %a")
                    :children (("General Task" :keys "k"
                                :icon ("inbox" :set "octicon" :color "yellow")
-                               :extra ""
-                               )
+                               :extra "")
                               ("Task with deadline" :keys "d"
                                :icon ("timer" :set "material" :color "orange" :v-adjust -0.1)
-                               :extra "\nDEADLINE: %^{Deadline:}t"
-                               )
+                               :extra "\nDEADLINE: %^{Deadline:}t")
                               ("Scheduled Task" :keys "s"
                                :icon ("calendar" :set "octicon" :color "orange")
-                               :extra "\nSCHEDULED: %^{Start time:}t"
-                               )
-                              ))
+                               :extra "\nSCHEDULED: %^{Start time:}t")))
                   ("Project" :keys "p"
                    :icon ("repo" :set "octicon" :color "silver")
                    :prepend t
@@ -5379,8 +5466,7 @@ set up org-capture.
                                :icon ("list" :set "faicon" :color "blue")
                                :time-or-todo "%U"
                                :heading "Unreleased"
-                               :file +org-capture-project-changelog-file))
-                   )
+                               :file +org-capture-project-changelog-file)))
                   ("\tCentralised project templates"
                    :keys "o"
                    :type entry
@@ -5403,8 +5489,7 @@ set up org-capture.
                                :keys "c"
                                :time-or-todo "%U"
                                :heading "Unreleased"
-                               :file +org-capture-central-project-changelog-file))
-                   )))))
+                               :file +org-capture-central-project-changelog-file)))))))
 
   (set-org-capture-templates)
   (unless (display-graphic-p)
@@ -5575,7 +5660,7 @@ the [[*Window title][Window title]].
 Org-roam is nice by itself, but there are so /extra/ nice packages which integrate
 with it.
 #+begin_src emacs-lisp :noweb-ref none :tangle packages.el
-(package! org-roam-ui :recipe (:host github :repo "org-roam/org-roam-ui" :files ("*.el" "out")) :pin "c745d07018a46b1a20b9f571d999ecf7a092c2e1")
+(package! org-roam-ui :recipe (:host github :repo "org-roam/org-roam-ui" :files ("*.el" "out")) :pin "cd1aefd56f648d32a25aae672ac1ab90893c0133")
 (package! websocket :pin "fda4455333309545c0787a79d73c19ddbeb57980") ; dependency of `org-roam-ui'
 #+end_src
 
@@ -9353,6 +9438,41 @@ able to handle anyway. For them we define a table of LaTeX translations
 #+begin_src emacs-lisp :noweb no-export
 <<gen-latex-non-ascii-char-substitutions()>>
 #+end_src
+**** Normal spaces after abbreviations
+
+In LaTeX inter-word and sentence spaces are typically of different widths. This
+can be an issue when using abbreviations i.e. e.g. etc. et al..
+This can be corrected by forcing a normal space with src_LaTeX{\ }.
+When exporting Org documents, we can add a filter to check for common
+abbreviations and make the space normal.
+
+#+begin_src emacs-lisp
+(defvar +org-latex-abbreviations
+  '(;; Latin
+    "cf." "e.g." "etc." "et al." "i.e." "v." "vs." "viz." "n.b."
+    ;; Corperate
+    "inc." "govt." "ltd." "pty." "dept."
+    ;; Temporal
+    "est." "c."
+    ;; Honorifics
+    "Dr." "Mr." "Mrs." "Ms." "Miss." "Sr." "Jr."
+    ;; Components of a work
+    "ed." "vol." "sec." "chap." "pt." "pp." "op." "no."
+    ;; Common usage
+    "approx." "misc." "min." "max.")
+  "A list of abbreviations that should be spaced correctly when exporting to LaTeX.")
+
+(defun +org-latex-correct-latin-abbreviation-spaces (text backend _info)
+  "Normalise spaces after Latin abbreviations."
+  (when (org-export-derived-backend-p backend 'latex)
+    (replace-regexp-in-string (rx (group (or line-start space)
+                                         (regexp (regexp-opt-group +org-latex-abbreviations)))
+                                  (or line-end space))
+                              "\\1\\\\ "
+                              text)))
+
+(add-to-list 'org-export-filter-paragraph-functions #'+org-latex-correct-latin-abbreviation-spaces t)
+#+end_src
 
 **** Extra special strings
 LaTeX already recognises =---= and =--= as em/en-dashes, =\-= as a shy hyphen, and the
@@ -10342,7 +10462,7 @@ Of course, there's an Emacs mode for this.
 
 #+begin_src emacs-lisp :tangle packages.el
 (package! beancount :recipe (:host github :repo "beancount/beancount-mode")
-  :pin "5be04a37d6a189f1680cb47d022a85d9faeba8fc")
+  :pin "ea8257881b7e276e8d170d724e3b2e179f25cb77")
 #+end_src
 
 #+begin_src emacs-lisp
