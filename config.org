@@ -655,7 +655,7 @@ ess                          ; emacs speaks statistics
 json                         ; At least it ain't XML
 (java +meghanada)            ; the poster child for carpal tunnel syndrome
 (javascript +lsp)            ; all(hope(abandon(ye(who(enter(here))))))
-(julia +lsp)                 ; Python, R, and MATLAB in a blender
+;; (julia +lsp)                 ; Python, R, and MATLAB in a blender (Disabled as no M1 support)
 kotlin                       ; a better, slicker Java(Script)
 (latex                       ; writing papers in Emacs has never been so fun
  +latexmk                    ; what else would you use?
@@ -2072,6 +2072,36 @@ For when you want to export to Jira
 (package! ox-jira)
 #+end_src
 
+** TRAMP
+Let's try to make tramp handle prompts better
+#+begin_src emacs-lisp
+(after! tramp
+  (setenv "SHELL" "/bin/bash")
+  (setq tramp-shell-prompt-pattern "\\(?:^\\|
+\\)[^]#$%>\n]*#?[]#$%>] *\\(\\[[0-9;]*[a-zA-Z] *\\)*")) ;; default + 
+#+end_src
+*** Troubleshooting
+In case the remote shell is misbehaving, here are some things to try
+**** Zsh
+There are some escape code you don't want, let's make it behave more considerately.
+#+begin_src shell :eval no :tangle no
+if [[ "$TERM" == "dumb" ]]; then
+    unset zle_bracketed_paste
+    unset zle
+    PS1='$ '
+    return
+fi
+#+end_src
+*** Guix
+[[https://guix.gnu.org/][Guix]] puts some binaries that TRAMP looks for in unexpected locations.
+That's no problem though, we just need to help TRAMP find them.
+#+begin_src emacs-lisp
+(after! tramp
+  (appendq! tramp-remote-path
+            '("~/.guix-profile/bin" "~/.guix-profile/sbin"
+              "/run/current-system/profile/bin"
+              "/run/current-system/profile/sbin")))
+#+end_src
 ** Visuals
 *** Info colours
 This makes manual pages nicer to look at by adding variable pitch fontification
@@ -2510,45 +2540,6 @@ From the =:core packages= module.
 #+begin_src emacs-lisp :tangle (if (executable-find "wal") "yes" "no")
 (run-with-idle-timer 0.1 nil (lambda () (add-hook 'doom-load-theme-hook 'theme-magic-from-emacs)))
 #+end_src
-** Tramp
-Let's try to make tramp handle prompts better
-#+begin_src emacs-lisp
-(after! tramp
-  (setenv "SHELL" "/bin/bash")
-  (setq tramp-shell-prompt-pattern "\\(?:^\\|
-\\)[^]#$%>\n]*#?[]#$%>] *\\(\\[[0-9;]*[a-zA-Z] *\\)*")) ;; default + 
-#+end_src
-*** Troubleshooting
-In case the remote shell is misbehaving, here are some things to try
-**** Zsh
-There are some escape code you don't want, let's make it behave more considerately.
-#+begin_src shell :eval no :tangle no
-if [[ "$TERM" == "dumb" ]]; then
-    unset zle_bracketed_paste
-    unset zle
-    PS1='$ '
-    return
-fi
-#+end_src
-*** Guix
-[[https://guix.gnu.org/][Guix]] puts some binaries that TRAMP looks for in unexpected locations.
-That's no problem though, we just need to help TRAMP find them.
-#+begin_src emacs-lisp
-(after! tramp
-  (appendq! tramp-remote-path
-            '("~/.guix-profile/bin" "~/.guix-profile/sbin"
-              "/run/current-system/profile/bin"
-              "/run/current-system/profile/sbin")))
-#+end_src
-** Treemacs
-Quite often there are superfluous files I'm not that interested in. There's no
-good reason for them to take up space. Let's add a mechanism to ignore them.
-#+begin_src emacs-lisp
-(after! all-the-icons
-  (setcdr (assoc "m" all-the-icons-extension-icon-alist)
-          (cdr (assoc "matlab" all-the-icons-extension-icon-alist))))
-#+end_src
-
 *** Prettier page breaks
 
 In some files, =^L= appears as a page break character. This isn't that visually
@@ -9388,51 +9379,51 @@ Now, there are some symbols that aren't included in =inputenc=, but we should be
 able to handle anyway. For them we define a table of LaTeX translations
 
 #+name: latex-non-ascii-char-substitutions
-| Character | LaTeX       |
-|-----------+-------------|
-| ɑ         | \(\alpha\)       |
-| β         | \(\beta\)       |
-| γ         | \(\gamma\)       |
-| δ         | \(\delta\)       |
-| ε         | \(\epsilon\)       |
-| ϵ         | \(\varepsilon\)       |
-| ζ         | \(\zeta\)       |
-| η         | \(\eta\)       |
-| θ         | \(\theta\)       |
-| ϑ         | \(\vartheta\)       |
-| ι         | \(\iota\)       |
-| κ         | \(\kappa\)       |
-| λ         | \(\lambda\)       |
-| μ         | \(\mu\)       |
-| ν         | \(\nu\)       |
-| ξ         | \(\xi\)       |
-| π         | \(\pi\)       |
-| ϖ         | \(\varpi\)       |
-| ρ         | \(\rho\)       |
+| Character | LaTeX |
+|-----------+-------|
+| ɑ         | \(\alpha\) |
+| β         | \(\beta\) |
+| γ         | \(\gamma\) |
+| δ         | \(\delta\) |
+| ε         | \(\epsilon\) |
+| ϵ         | \(\varepsilon\) |
+| ζ         | \(\zeta\) |
+| η         | \(\eta\) |
+| θ         | \(\theta\) |
+| ϑ         | \(\vartheta\) |
+| ι         | \(\iota\) |
+| κ         | \(\kappa\) |
+| λ         | \(\lambda\) |
+| μ         | \(\mu\) |
+| ν         | \(\nu\) |
+| ξ         | \(\xi\) |
+| π         | \(\pi\) |
+| ϖ         | \(\varpi\) |
+| ρ         | \(\rho\) |
 | ϱ         | \(\varrho\) |
-| σ         | \(\sigma\)       |
-| ς         | \(\varsigma\)       |
-| τ         | \(\tau\)       |
-| υ         | \(\upsilon\)       |
-| ϕ         | \(\phi\)       |
-| φ         | \(\varphi\)       |
-| ψ         | \(\psi\)       |
-| ω         | \(\omega\)       |
-| Γ         | \(\Gamma\)       |
-| Δ         | \(\Delta\)       |
-| Θ         | \(\Theta\)       |
-| Λ         | \(\Lambda\)       |
-| Ξ         | \(\Xi\)       |
-| Π         | \(\Pi\)       |
-| Σ         | \(\Sigma\)       |
-| Υ         | \(\Upsilon\)       |
-| Φ         | \(\Phi\)       |
-| Ψ         | \(\Psi\)       |
-| Ω         | \(\Omega\)       |
-| א         | \(\aleph\)       |
-| ב         | \(\beth\)       |
+| σ         | \(\sigma\) |
+| ς         | \(\varsigma\) |
+| τ         | \(\tau\) |
+| υ         | \(\upsilon\) |
+| ϕ         | \(\phi\) |
+| φ         | \(\varphi\) |
+| ψ         | \(\psi\) |
+| ω         | \(\omega\) |
+| Γ         | \(\Gamma\) |
+| Δ         | \(\Delta\) |
+| Θ         | \(\Theta\) |
+| Λ         | \(\Lambda\) |
+| Ξ         | \(\Xi\) |
+| Π         | \(\Pi\) |
+| Σ         | \(\Sigma\) |
+| Υ         | \(\Upsilon\) |
+| Φ         | \(\Phi\) |
+| Ψ         | \(\Psi\) |
+| Ω         | \(\Omega\) |
+| א         | \(\aleph\) |
+| ב         | \(\beth\) |
 | ד         | \(\daleth\) |
-| ג         | \(\gimel\)       |
+| ג         | \(\gimel\) |
 
 #+name: gen-latex-non-ascii-char-substitutions
 #+begin_src emacs-lisp :noweb-ref none :var latex-non-ascii-char-substitutions=latex-non-ascii-char-substitutions
