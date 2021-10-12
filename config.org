@@ -2072,14 +2072,14 @@ For when you want to export to Jira
 (package! ox-jira)
 #+end_src
 
-** TRAMP
-Let's try to make tramp handle prompts better
-#+begin_src emacs-lisp
-(after! tramp
-  (setenv "SHELL" "/bin/bash")
-  (setq tramp-shell-prompt-pattern "\\(?:^\\|
-\\)[^]#$%>\n]*#?[]#$%>] *\\(\\[[0-9;]*[a-zA-Z] *\\)*")) ;; default + 
+*** Poetry mode
+1. This needs =rhyme= installed from https://github.com/shaunplee/homebrew-rhyme
+2. Then =poetry.el= from http://www.bobnewell.net/filez/poetry.el
+
+#+begin_src emacs-lisp :tangle packages.el
+(package! poetry)
 #+end_src
+
 *** Troubleshooting
 In case the remote shell is misbehaving, here are some things to try
 **** Zsh
@@ -2101,6 +2101,7 @@ That's no problem though, we just need to help TRAMP find them.
             '("~/.guix-profile/bin" "~/.guix-profile/sbin"
               "/run/current-system/profile/bin"
               "/run/current-system/profile/sbin")))
+
 #+end_src
 ** Visuals
 *** Info colours
