@@ -2079,6 +2079,11 @@ For when you want to export to Jira
 #+begin_src emacs-lisp :tangle packages.el
 (package! poetry)
 #+end_src
+*** Simple httpd
+
+#+begin_src emacs-lisp :tangle packages.el
+(package! simple-httpd)
+#+end_src
 
 *** Troubleshooting
 In case the remote shell is misbehaving, here are some things to try
