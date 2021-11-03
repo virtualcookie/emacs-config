@@ -8218,34 +8218,8 @@ with =citar=, and make the symbols a bit prettier.
           (link ,(all-the-icons-octicon "link" :face 'all-the-icons-orange :v-adjust 0.01) . " "))))
 #+end_src
 
-We can also make the Zotero CSL styles available to use.
-
-#+begin_src emacs-lisp
-(after! oc-csl
-  (setq org-cite-csl-styles-dir "~/Zotero/styles"))
-#+end_src
-
-Since CSL works so nicely everywhere, we might as well use it as the default
-citation export processor for everything.
-
-#+begin_src emacs-lisp
-(after! oc
-  (setq org-cite-export-processors '((t csl))))
-#+end_src
-
-Then, for convenience we'll cap things off by putting the citation command under
-Org's localleader.
-
-#+begin_src emacs-lisp
-(map! :after org
-      :map org-mode-map
-      :localleader
-      :desc "Insert citation" "@" #'org-cite-insert)
-#+end_src
-
-Lastly, just in case I come across any old citations of mine, I think it would
-be nice to have a function to convert =org-ref= citations to =org-cite= forms.
-
+I think it would be nice to have a function to convert =org-ref= citations to
+=org-cite=
 #+begin_src emacs-lisp
 (after! oc
   (defun org-ref-to-org-cite ()
