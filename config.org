@@ -3246,7 +3246,7 @@ Then, to actually read the ebooks we use =nov=.
                 shr-use-colors nil)
     (require 'visual-fill-column nil t)
     (setq-local visual-fill-column-center-text t
-                visual-fill-column-width 80
+                visual-fill-column-width 81
                 nov-text-width 80)
     (visual-fill-column-mode 1)
     (hl-line-mode -1)
@@ -5958,8 +5958,7 @@ appropriate.  In tables, insert a new row or end the table."
                  (forward-line)
                  (insert "\n")
                  (forward-line -1))
-               ;; FIXME: looking-back is supposed to be called with more arguments.
-               (while (not (looking-back (rx (repeat 3 (seq (optional blank) "\n")))))
+               (while (not (looking-back "\\(?:[[:blank:]]?\n\\)\\{3\\}" nil))
                  (insert "\n"))
                (forward-line -1)))))
 
