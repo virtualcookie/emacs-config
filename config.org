@@ -15,6 +15,11 @@
 #+options: coverpage:yes
 #+startup: fold
 
+#+latex_class: book
+#+latex_header: \usepackage[autooneside=false,automark,headsepline]{scrlayer-scrpage}
+#+latex_header: \clearpairofpagestyles \renewcommand*{\chaptermarkformat}{} \renewcommand*{\sectionmarkformat}{}
+#+latex_header: \ihead{\upshape\scshape\leftmark} \chead{\ifstr{\leftmark}{\rightmark}{}{\rightmark}} \ohead[\pagemark]{\pagemark}
+
 #+begin_export html
 <a href="https://github.com/tecosaur/emacs-config/"
    style="font-family: 'Open Sans'; background-image: none; color: inherit;
@@ -37,7 +42,7 @@ let us concentrate rather on explaining to human beings what we want a
 computer to do. @@latex:\mbox{@@--- Donald Knuth@@latex:}@@
 #+end_quote
 
-* Intro
+* Introduction
 Customising an editor can be very rewarding ... until you have to leave it.
 For years I have been looking for ways to avoid this pain.
 Then I discovered [[https://github.com/cknadler/vim-anywhere][vim-anywhere]], and found that it had an Emacs companion,
@@ -1043,7 +1048,6 @@ straightforward, I'll just redefine it to a simpler, async, function.
     (signal 'quit nil)))
 (add-hook! 'kill-emacs-hook #'+literate-tangle-check-finished)
 #+end_src
-#+end_src
 *** Dashboard quick actions
 
 When using the dashboard, there are often a small number of actions I will take.
@@ -1768,6 +1772,87 @@ From the =:tools magit= module.
 [[xkcd:1597]]
 
 Magit is great as-is, thanks for making such a lovely package [[https://github.com/tarsius][Jonas]]!
+
+**** Commit message templates
+
+One little thing I want to add is some per-project commit message templates.
+#+begin_src emacs-lisp
+(defvar +magit-project-commit-templates-alist nil
+  "Alist of toplevel dirs and template strings/functions.")
+(after! magit
+  (defun +magit-fill-in-commit-template ()
+    "Insert template from `+magit-fill-in-commit-template' if applicable."
+    (when-let ((template (cdr (assoc (file-name-base (directory-file-name (magit-toplevel)))
+                                     +magit-project-commit-templates-alist))))
+      (goto-char (point-min))
+      (insert (if (stringp template) template (funcall template)))
+      (goto-char (point-min))
+      (end-of-line)))
+  (add-hook 'git-commit-setup-hook #'+magit-fill-in-commit-template 90))
+#+end_src
+
+This is particularly useful when creating commits for Org, as they need to
+follow [[https://orgmode.org/worg/org-contribute.html#commit-messages][a certain format]] and sometimes I forget elements (oops!).
+#+begin_src emacs-lisp
+(after! magit
+  (defun +org-commit-message-template ()
+    "Create a skeleton for an Org commit message based on the staged diff."
+    (let (change-data last-file file-changes temp-point)
+      (with-temp-buffer
+        (apply #'call-process magit-git-executable
+               nil t nil
+               (append
+                magit-git-global-arguments
+                (list "diff" "--cached")))
+        (goto-char (point-min))
+        (message "%s" (buffer-string))
+        (while (re-search-forward "^@@\\|^\\+\\+\\+ b/" nil t)
+          (if (looking-back "^\\+\\+\\+ b/" (line-beginning-position))
+              (progn
+                (push (list last-file file-changes) change-data)
+                (setq last-file (buffer-substring-no-properties (point) (line-end-position))
+                      file-changes nil))
+            (setq temp-point (line-beginning-position))
+            (re-search-forward "^\\+\\|^-" nil t)
+            (end-of-line)
+            (cond
+             ((string-match-p "\\.el$" last-file)
+              (when (re-search-backward "^\\(?:[+-]? *\\|@@[ +-\\d,]+@@ \\)(\\(?:cl-\\)?\\(?:defun\\|defvar\\|defmacro\\|defcustom\\)" temp-point t)
+                (re-search-forward "\\(?:cl-\\)?\\(?:defun\\|defvar\\|defmacro\\|defcustom\\) " nil t)
+                (add-to-list 'file-changes (buffer-substring-no-properties (point) (forward-symbol 1)))))
+             ((string-match-p "\\.org$" last-file)
+              (when (re-search-backward "^[+-]\\*+ \\|^@@[ +-\\d,]+@@ \\*+ " temp-point t)
+                (re-search-forward "@@ \\*+ " nil t)
+                (add-to-list 'file-changes (buffer-substring-no-properties (point) (line-end-position)))))))))
+      (push (list last-file file-changes) change-data)
+      (setq change-data (delete '(nil nil) change-data))
+      (concat
+       (if (= 1 (length change-data))
+           (replace-regexp-in-string "^.*/\\|.[a-z]+$" "" (caar change-data))
+         "?")
+       ": \n\n"
+       (mapconcat
+        (lambda (file-changes)
+          (if (cadr file-changes)
+              (format "* %s (%s): "
+                      (car file-changes)
+                      (mapconcat #'identity (cadr file-changes) ", "))
+            (format "* %s: " (car file-changes))))
+        change-data
+        "\n\n"))))
+
+  (add-to-list '+magit-project-commit-templates-alist (cons "org-mode" #'+org-commit-message-template)))
+#+end_src
+
+This relies on two small entries in the git config files which improves the hunk
+heading line selection for elisp and Org files.
+#+begin_src gitconfig
+[diff "lisp"]
+  xfuncname = "^(((;;;+ )|\\(|([ \t]+\\(((cl-|el-patch-)?def(un|var|macro|method|custom)|gb/))).*)$"
+
+[diff "org"]
+  xfuncname = "^(\\*+ +.*)$"
+#+end_src
 
 *** Magit delta
 
@@ -4911,17 +4996,18 @@ post-processing the =latexdiff= result.
   (add-to-list 'orgdiff-latexdiff-postprocess-hooks #'+orgdiff-nicer-change-colours))
 #+end_src
 
-***** Fix Doom breakage
-This is to fix breaking changes in doom =Could not find package gitconfig-mode= which can be fixed by the following workaround
-[[https://github.com/hlissner/doom-emacs/issues/5667#issuecomment-948229579][https://github.com/hlissner/doom-emacs/issues/5667#issuecomment-948229579]]
-
+***** Org music
+It's nice to be able to link to music
 #+begin_src emacs-lisp
-(package! gitconfig-mode
-	  :recipe (:host github :repo "magit/git-modes"
-			 :files ("gitconfig-mode.el")))
-(package! gitignore-mode
-	  :recipe (:host github :repo "magit/git-modes"
-			 :files ("gitignore-mode.el")))
+(package! org-music :recipe (:local-repo "lisp/org-music"))
+#+end_src
+#+begin_src emacs-lisp :tangle yes
+(use-package! org-music
+  :after org
+  :config
+  (setq org-music-mpris-player "Lollypop"
+        org-music-track-search-method 'beets
+        org-music-beets-db "~/Music/library.db"))
 #+end_src
 
 *** Behaviour
@@ -5060,54 +5146,41 @@ There's also the new =org-cite= though. It would be nice to try that out.
 To improve =org-cite=.
 
 #+begin_src emacs-lisp :noweb-ref none :tangle packages.el
-;(package! bibtex-actions :pin "8130de52d9bf246d56bda0299ffea08108f0463b")
-(package! citeproc :pin "91d7630de1ec61ff5d5e62c27d820207ec5bb1c6")
-(package! bibtex-completion :pin "bb47f355b0da8518aa3fb516019120c14c8747c9")
-(package! org-cite-csl-activate :recipe (:host github :repo "andras-simonyi/org-cite-csl-activate") :pin "032e765a4cf634fc56abcd18488510d3d5b1ee09")
+(package! citar :pin "a6926650114a8091f98bff8c7fd00add82043190")
+(package! citeproc :pin "38e70c0a94eeefe86ddefc38dfa8ab2311008774")
+(package! org-cite-csl-activate :recipe (:host github :repo "andras-simonyi/org-cite-csl-activate") :pin "8f49ccbd337edda01e52da0c75f6a76e2cc976f7")
 #+end_src
 
 #+begin_src emacs-lisp :noweb-ref none :tangle yes
-(use-package! bibtex-completion
-  :defer t
-  :config
-  (setq bibtex-completion-additional-search-fields '(keywords)
-        bibtex-completion-pdf-field "file")) ; This tell bibtex-completion to look at the File field of the bibtex to figure out which pdf to open
-
-;(use-package! bibtex-actions
-;  :after embark bibtex-completion
-;  :config
-;  (add-to-list 'embark-keymap-alist '(bibtex . bibtex-actions-map)))
+(use-package! citar
+  :when (featurep! :completion vertico))
 
 (use-package! citeproc
   :defer t)
 
 ;;; Org-Cite configuration
 
-;(use-package! oc
-;  :after org bibtex-completion bibtex-actions
-;  :config
-;  (require 'ox)
-;  (map! :map org-mode-map
-;        :localleader
-;        :desc "Insert citation" "@" #'org-cite-insert)
-;  (defvar bibtex-actions-bibliography nil)
-;  (setq org-cite-global-bibliography
-;        (let ((paths (or bibtex-actions-bibliography
-;                         bibtex-completion-bibliography)))
-;          ;; Always return bibliography paths as list for org-cite.
-;          (if (stringp paths) (list paths) paths)))
-;  ;; setup export processor; default csl/citeproc-el, with biblatex for latex
-;  (setq org-cite-export-processors '((t csl))))
+(map! :after org
+      :map org-mode-map
+      :localleader
+      :desc "Insert citation" "@" #'org-cite-insert)
 
-;;; Org-cite processors
+(use-package! oc
+  :after org citar
+  :config
+  (require 'ox)
+  (setq org-cite-global-bibliography
+        (let ((paths (or citar-bibliography
+                         (bound-and-true-p bibtex-completion-bibliography))))
+          ;; Always return bibliography paths as list for org-cite.
+          (if (stringp paths) (list paths) paths)))
+  ;; setup export processor; default csl/citeproc-el, with biblatex for latex
+  (setq org-cite-export-processors
+        '((t csl))))
 
-;;;; Core
-
-;(use-package! oc-basic
-;  :after oc)
-
-;(use-package! oc-biblatex
-;  :after oc)
+  ;;; Org-cite processors
+(use-package! oc-biblatex
+  :after oc)
 
 ;(use-package! oc-csl
 ;  :after oc
@@ -5119,31 +5192,40 @@ To improve =org-cite=.
 
 ;;;; Third-party
 
-;(use-package! oc-csl-activate
-;  :after oc
-;  :config
-;  (defun +org-cite-csl-activate/enable ()
-;    (interactive)
-;    (setq org-cite-activate-processor 'csl-activate)
-;    (add-hook! 'org-mode-hook '((lambda () (cursor-sensor-mode 1)) org-cite-csl-activate-render-all))
-;    (defadvice! +org-cite-csl-activate-render-all-silent (orig-fn)
-;      :around #'org-cite-csl-activate-render-all
-;      (with-silent-modifications (funcall orig-fn)))
-;    (when (eq major-mode 'org-mode)
-;      (with-silent-modifications
-;        (save-excursion
-;          (goto-char (point-min))
-;          (org-cite-activate (point-max)))
-;        (org-cite-csl-activate-render-all)))))
+(use-package! citar-org
+  :no-require
+  :custom
+  (org-cite-insert-processor 'citar)
+  (org-cite-follow-processor 'citar)
+  (org-cite-activate-processor 'citar)
+  (org-support-shift-select t)
+  (when (featurep! :lang org +roam2)
+    ;; Include property drawer metadata for 'org-roam' v2.
+    (citar-org-note-include '(org-id org-roam-ref)))
+  ;; Personal extras
+  (setq citar-symbols
+        `((file ,(all-the-icons-faicon "file-o" :v-adjust -0.1) . " ")
+          (note ,(all-the-icons-material "speaker_notes" :face 'all-the-icons-silver :v-adjust -0.3) . " ")
+          (link ,(all-the-icons-octicon "link" :face 'all-the-icons-dsilver :v-adjust 0.01) . " "))))
 
-;(use-package! oc-bibtex-actions
-;  :when (featurep! :completion vertico)
-;  :after oc
-;  :demand t
-;  :config
-;  (setq org-cite-insert-processor 'oc-bibtex-actions
-;        org-cite-follow-processor 'oc-bibtex-actions
-;        org-cite-activate-processor 'basic))
+(use-package! oc-csl-activate
+  :after oc
+  :config
+  (setq org-cite-csl-activate-use-document-style t)
+  (defun +org-cite-csl-activate/enable ()
+    (interactive)
+    (setq org-cite-activate-processor 'csl-activate)
+    (add-hook! 'org-mode-hook '((lambda () (cursor-sensor-mode 1)) org-cite-csl-activate-render-all))
+    (defadvice! +org-cite-csl-activate-render-all-silent (orig-fn)
+      :around #'org-cite-csl-activate-render-all
+      (with-silent-modifications (funcall orig-fn)))
+    (when (eq major-mode 'org-mode)
+      (with-silent-modifications
+        (save-excursion
+          (goto-char (point-min))
+          (org-cite-activate (point-max)))
+        (org-cite-csl-activate-render-all)))
+    (fmakunbound #'+org-cite-csl-activate/enable)))
 #+end_src
 
 I think it would be nice to have a function to convert =org-ref= citations to
@@ -6219,280 +6301,6 @@ Saving seconds adds up after all! (but only so much)
 #+end_src
 
 ***** Music
-First, we set up all the necessarily 'utility' functions.
-Disabled by changing the src language from =emacs-lisp= to =elisp=
-#+begin_src elisp
-(after! org
-  (defvar org-music-player 'mpris
-    "Music player type. Curretly only supports mpris.")
-  (defvar org-music-mpris-player "Lollypop"
-    "Name of the mpris player, used in the form org.gnome.MPRIS.")
-  (defvar org-music-track-search-method 'beets
-    "Method to find the track file from the link.")
-  (defvar org-music-beets-db "~/Music/library.db"
-    "Location of the beets DB, for when using beets as the `org-music-track-search-method'")
-  (defvar org-music-folder "~/Music/"
-    "Location of your music folder, for when using file as the `org-music-track-search-method'")
-  (defvar org-music-recognised-extensions '("flac" "mp4" "m4a" "aiff" "wav" "ogg" "aiff")
-    "When searching for files in `org-music-track-search-method', recognise these extensions as audio files.")
-
-  (defun org-music-get-link (full &optional include-time)
-    "Generate link string for currently playing track, optionally including a time-stamp"
-    (pcase org-music-player ;; NOTE this could do with better generalisation
-      ('mpris (let* ((track-metadata
-                      (org-music-mpris-get-property "Metadata"))
-                     (album-artist (caar (cadr (assoc "xesam:albumArtist" track-metadata))))
-                     (artist (if (or (equal album-artist "")
-                                     (s-contains-p "various" album-artist t))
-                                 (caar (cadr (assoc "xesam:artist" track-metadata)))
-                               album-artist))
-                     (track (car (cadr (assoc "xesam:title" track-metadata))))
-                     (start-time (when include-time
-                                   (/ (org-music-mpris-get-property "Position") 1000000))))
-                (if full
-                    (format "[[music:%s][%s by %s]]" (org-music-format-link artist track start-time) track artist)
-                  (org-music-format-link artist track start-time))))
-      (_ (user-error! "The specified music player: %s is not supported" org-music-player))))
-
-  (defun org-music-format-link (artist track &optional start-time end-time)
-    (let ((artist (replace-regexp-in-string ":" "\\:" artist))
-          (track (replace-regexp-in-string ":" "\\:" track)))
-      (concat artist ":" track
-              (cond ((and start-time end-time)
-                     (format "::%s-%s"
-                             (org-music-seconds-to-time start-time)
-                             (org-music-seconds-to-time end-time)))
-                    (start-time
-                     (format "::%s"
-                             (org-music-seconds-to-time start-time)))))))
-
-  (defun org-music-parse-link (link)
-    (let* ((link-dc (->> link
-                         (replace-regexp-in-string "\\([^\\\\]\\)\\\\:" "\\1#COLON#")
-                         (replace-regexp-in-string "\\(::[a-z0-9]*[0-9]\\)\\'" "\\1s")))
-           (link-components (mapcar (lambda (lc) (replace-regexp-in-string "#COLON#" ":" lc))
-                                    (s-split ":" link-dc)))
-           (artist (nth 0 link-components))
-           (track (nth 1 link-components))
-           (durations (when (and (> (length link-components) 3)
-                                 (equal (nth 2 link-components) ""))
-                        (s-split "-" (nth 3 link-components))))
-           (start-time (when durations
-                         (org-music-time-to-seconds (car durations))))
-           (end-time (when (cdr durations)
-                       (org-music-time-to-seconds (cadr durations)))))
-      (list artist track start-time end-time)))
-
-  (defun org-music-seconds-to-time (seconds)
-    "Convert a number of seconds to a nice human duration, e.g. 5m21s.
-This action is reversed by `org-music-time-to-seconds'."
-    (if (< seconds 60)
-        (format "%ss" seconds)
-      (if (< seconds 3600)
-          (format "%sm%ss" (/ seconds 60) (% seconds 60))
-        (format "%sh%sm%ss" (/ seconds 3600) (/ (% seconds 3600) 60) (% seconds 60)))))
-
-  (defun org-music-time-to-seconds (time-str)
-    "Get the number of seconds in a string produced by `org-music-seconds-to-time'."
-    (let* ((time-components (reverse (s-split "[a-z]" time-str)))
-           (seconds (string-to-number (nth 1 time-components)))
-           (minutes (when (> (length time-components) 2)
-                      (string-to-number (nth 2 time-components))))
-           (hours (when (> (length time-components) 3)
-                    (string-to-number (nth 3 time-components)))))
-      (+ (* 3600 (or hours 0)) (* 60 (or minutes 0)) seconds)))
-
-  (defun org-music-play-track (artist title &optional start-time end-time)
-    "Play the track specified by ARTIST and TITLE, optionally skipping to START-TIME in, stopping at END-TIME."
-    (if-let ((file (org-music-find-track-file artist title)))
-        (pcase org-music-player
-          ('mpris (org-music-mpris-play file start-time end-time))
-          (_ (user-error! "The specified music player: %s is not supported" org-music-player)))
-      (user-error! "Could not find the track '%s' by '%s'" title artist)))
-
-  (add-transient-hook! #'org-music-play-track
-    (require 'dbus))
-
-  (defun org-music-mpris-play (file &optional start-time end-time)
-    (let ((uri (url-encode-url (rng-file-name-uri file))))
-      (org-music-mpris-call-method "OpenUri" uri)
-      (let ((track-id (caadr (assoc "mpris:trackid"
-                                    (org-music-mpris-get-property "Metadata")))))
-        (when start-time
-          (org-music-mpris-call-method "SetPosition" :object-path track-id
-                                       :int64 (round (* start-time 1000000))))
-        (when end-time
-          (org-music-mpris-stop-at-time uri end-time)))))
-
-  (defun orgb3-music-mpris-stop-at-time (url end-time)
-    "Check that url is playing, and if it is stop it at END-TIME."
-    (when (equal url (caadr (assoc "xesam:url" (org-music-mpris-get-property "Metadata"))))
-      (let* ((time-current (/ (/ (org-music-mpris-get-property "Position") 10000) 100.0))
-             (time-delta (- end-time time-current)))
-        (message "%s" time-delta)
-        (if (< time-delta 0)
-            (org-music-mpris-call-method "Pause")
-          (if (< time-delta 6)
-              (run-at-time (max 0.001 (* 0.9 time-delta)) nil #'org-music-mpris-stop-at-time url end-time)
-            (run-at-time 5 nil #'org-music-mpris-stop-at-time url end-time))))))
-
-  (defun org-music-mpris-get-property (property)
-    "Return the value of org.mpris.MediaPlayer2.Player.PROPERTY."
-    (dbus-get-property :session (concat "org.gnome." org-music-mpris-player)
-                       "/org/mpris/MediaPlayer2" "org.mpris.MediaPlayer2.Player"
-                       property))
-
-  (defun org-music-mpris-call-method (property &rest args)
-    "Call org.mpris.MediaPlayer2.Player.PROPERTY with ARGS, returning the result."
-    (apply #'dbus-call-method :session (concat "org.gnome." org-music-mpris-player)
-           "/org/mpris/MediaPlayer2" "org.mpris.MediaPlayer2.Player"
-           property args))
-
-  (defun org-music-guess-mpris-player ()
-    (when-let ((players
-                (-filter (lambda (interface)
-                           (s-contains-p "org.mpris.MediaPlayer2" interface))
-                         (dbus-call-method :session
-                                           dbus-service-dbus
-                                           dbus-path-dbus
-                                           dbus-interface-dbus
-                                           "ListNames"))))
-      (replace-regexp-in-string "org\\.mpris\\.MediaPlayer2\\." "" (car players))))
-
-  (when (eq org-music-player 'mpris)
-    (unless org-music-mpris-player
-      (setq org-music-mpris-player (org-music-guess-mpris-player))))
-
-  (defun org-music-find-track-file (artist title)
-    "Try to find the file for TRACK by ARTIST, using `org-music-track-search-method', returning nil if nothing could be found."
-    (pcase org-music-track-search-method
-      ('file (org-music-find-file artist title))
-      ('beets (org-music-beets-find-file artist title))
-      (_ (user-error! "The specified music search method: %s is not supported" org-music-track-search-method))))
-
-  (defun org-music-beets-find-file (artist title)
-    "Find the file correspanding to a given artist and title."
-    (let* ((artist-escaped (replace-regexp-in-string "\"" "\\\"" artist))
-           (title-escaped (replace-regexp-in-string "\"" "\\\"" title))
-           (file
-            (or
-             (shell-command-to-string
-              (format
-               "sqlite3 '%s' \"SELECT path FROM items WHERE albumartist IS '%s' AND title IS '%s' LIMIT 1 COLLATE NOCASE\""
-               (expand-file-name org-music-beets-db) artist-escaped title-escaped))
-             (shell-command-to-string
-              (format
-               "sqlite3 '%s' \"SELECT path FROM items WHERE artist IS '%s' AND title IS '%s' LIMIT 1 COLLATE NOCASE\""
-               (expand-file-name org-music-beets-db) artist-escaped title-escaped)))))
-      (if (> (length file) 0)
-          (substring file 0 -1)
-        )))
-
-  (defun org-music-find-file (artist title)
-    "Try to find a file in `org-music-folder' which contains TITLE, looking first in ./ARTIST if possible."
-    (when-let* ((music-folder (expand-file-name org-music-folder))
-                (search-folders (or
-                                 (-filter ; look for folders which contain ARTIST
-                                  (lambda (file-or-folder)
-                                    (and
-                                     (s-contains-p artist (file-name-base file-or-folder) t)
-                                     (file-directory-p file-or-folder)))
-                                  (directory-files music-folder t))
-                                 (list music-folder)))
-                (extension-regex (format "\\.\\(?:%s\\)\\'" (s-join "\\|" org-music-recognised-extensions)))
-                (tracks (-filter
-                         (lambda (file)
-                           (s-contains-p title (file-name-base file) t))
-                         (-flatten (mapcar (lambda (dir)
-                                             (directory-files-recursively dir extension-regex))
-                                           search-folders)))))
-      (when (> (length tracks) 1)
-        (message "Warning: multiple matches for %s by %s found" title artist))
-      (car tracks))))
-#+end_src
-
-Then we integrate this nicely with org-mode
-Disabled by changing the src language from =emacs-lisp= to =elisp=
-#+begin_src elisp
-(after! org
-  (org-link-set-parameters "music"
-                           :follow #'org-music-open-fn
-                           :export #'org-music-export-text)
-
-  (org-link-set-parameters "Music" ;; like music, but visually fancier
-                           ;; FIXME this should work as far as I can tell
-                           ;; :image-data-fun #'org-music-image-fn
-                           :follow #'org-music-open-fn
-                           :export #'org-music-fancy-export)
-
-  (defun org-music-open-fn (link)
-    (apply #'org-music-play-track (org-music-parse-link link)))
-
-  (defun org-music-insert-current-track (&optional include-time)
-    "Insert link to currest track, including a timestamp when the universal argument is supplied."
-    (interactive "P")
-    (pp include-time)
-    (insert (org-music-get-link t include-time)))
-
-  (defun org-music-export-text (path desc backend _com &optional newline)
-    (let* ((track-info (org-music-parse-link path))
-           (artist (nth 0 track-info))
-           (track (nth 1 track-info))
-           (start-time (nth 2 track-info))
-           (end-time (nth 3 track-info))
-           (emphasise (cond ((org-export-derived-backend-p backend 'html)
-                             (lambda (s) (format "<span style=\"font-style: italic\">%s</span>" s)))
-                            ((org-export-derived-backend-p backend 'latex)
-                             (lambda (s) (format "\\emph{%s}" s)))
-                            (t (lambda (s) s)))))
-      (or desc
-          (concat
-           (cond ((and start-time end-time)
-                  (format "%s to %s seconds of%s" start-time end-time (or newline " ")))
-                 (start-time
-                  (format "%s seconds into%s" start-time (or newline " "))))
-           (funcall emphasise track)
-           (or newline " ")
-           "by "
-           artist))))
-
-  (defun org-music-cover-image (track-file)
-    "Try to find a cover image for the track in the given location"
-    (car (-filter (lambda (file)
-                    (-contains-p '("png" "jpg" "jpeg") (file-name-extension file)))
-                  (directory-files (file-name-directory track-file) t "cover"))))
-
-  (defun org-music-image-fn (_protocol link _description)
-    (when-let* ((track-data (org-music-parse-link link))
-                (cover-file (org-music-cover-image
-                             (org-music-find-track-file
-                              (nth 0 track-data) (nth 1 track-data)))))
-      (with-temp-buffer
-        (set-buffer-multibyte nil)
-        (setq buffer-file-coding-system 'binary)
-        (insert-file-contents-literally cover-file)
-        (buffer-substring-no-properties (point-min) (point-max)))))
-
-  (defun org-music-fancy-export (path desc backend _com)
-    (let* ((track-data (org-music-parse-link path))
-           (file (org-music-find-track-file
-                  (nth 0 track-data) (nth 1 track-data)))
-           (cover-img (org-music-cover-image file))
-           (newline-str (cond ((org-export-derived-backend-p backend 'html) "<br>")
-                              ((org-export-derived-backend-p backend 'latex) "\\newline ")
-                              (t " ")))
-           (text (org-music-export-text path nil backend nil newline-str)))
-      (cond ((org-export-derived-backend-p backend 'html)
-             (format "<div class='music-track'>
-    <img src='%s'> <span>%s</span>
-</div>" cover-img text)
-             )
-            ((org-export-derived-backend-p backend 'latex)
-             (format "\\begin{tabular}{@{\\hspace{0.3\\columnwidth}}r@{\\hspace{0.1\\columnwidth}}p{0.4\\columnwidth}}
-  \\includegraphics[height=6em]{%s} & \\vspace{-0.12\\columnwidth}%s
-\\end{tabular}" cover-img text))
-            (t text)))))
-#+end_src
 ***** YouTube
 The ~[[yt:...]]~ links preview nicely, but don't export nicely. Thankfully, we can
 fix that.
@@ -8101,12 +7909,27 @@ commands below are defined.
 I really like the KOMA bundle. It provides a set of mechanisms to tweak document
 styling which is both easy to use, and quite comprehensive.
 For example, I rather like section numbers in the margin, which can be
-acomplished with
+accomplished with
 #+name: latex-hanging-secnum
 #+begin_src LaTeX
 \\renewcommand\\sectionformat{\\llap{\\thesection\\autodot\\enskip}}
 \\renewcommand\\subsectionformat{\\llap{\\thesubsection\\autodot\\enskip}}
 \\renewcommand\\subsubsectionformat{\\llap{\\thesubsubsection\\autodot\\enskip}}
+#+end_src
+
+It can also be nice to have big =\chapter=​s.
+#+name: latex-big-chapter
+#+begin_src LaTeX
+\\RedeclareSectionCommand[afterindent=false, beforeskip=0pt, afterskip=0pt, innerskip=0pt]{chapter}
+\\setkomafont{chapter}{\\normalfont\\Huge}
+\\renewcommand*{\\chapterheadstartvskip}{\\vspace*{0\\baselineskip}}
+\\renewcommand*{\\chapterheadendvskip}{\\vspace*{0\\baselineskip}}
+\\renewcommand*{\\chapterformat}{%
+  \\fontsize{60}{30}\\selectfont\\rlap{\\hspace{6pt}\\thechapter}}
+\\renewcommand*\\chapterlinesformat[3]{%
+  \\parbox[b]{\\dimexpr\\textwidth-0.5em\\relax}{%
+    \\raggedleft{{\\large\\scshape\\bfseries\\chapapp}\\vspace{-0.5ex}\\par\\Huge#3}}%
+    \\hfill\\makebox[0pt][l]{#2}}
 #+end_src
 
 Now let's just sprinkle some KOMA all over the Org LaTeX classes.
@@ -8122,6 +7945,9 @@ Now let's just sprinkle some KOMA all over the Org LaTeX classes.
                                 article-sections))
          (hanging-secnum-preamble "
 <<latex-hanging-secnum>>
+")
+         (big-chap-preamble "
+<<latex-big-chapter>>
 "))
     (setcdr (assoc "article" org-latex-classes)
             `(,(concat "\\documentclass{scrartcl}" hanging-secnum-preamble)
@@ -8130,7 +7956,8 @@ Now let's just sprinkle some KOMA all over the Org LaTeX classes.
                  `("report" ,(concat "\\documentclass{scrartcl}" hanging-secnum-preamble)
                    ,@article-sections))
     (add-to-list 'org-latex-classes
-                 `("book" "\\documentclass{scrbook}"
+                 `("book" ,(concat "\\documentclass[twoside=false]{scrbook}"
+                                   big-chap-preamble hanging-secnum-preamble)
                    ,@book-sections))
     (add-to-list 'org-latex-classes
                  `("blank" "[NO-DEFAULT-PACKAGES]\n[NO-PACKAGES]\n[EXTRA]"
@@ -8451,7 +8278,7 @@ introduce an =:order= keyword. Using this I'll arrange snippets as follows.
 #+begin_src emacs-lisp
 (defvar org-latex-feature-implementations
   '((image         :snippet "\\usepackage{graphicx}" :order 2)
-    (svg           :snippet "\\usepackage{svg}" :order 2)
+    (svg           :snippet "\\usepackage[inkscapelatex=false]{svg}" :order 2)
     (maths         :snippet "\\usepackage[nofont]{bmc-maths}" :order 0.2)
     (table         :snippet "\\usepackage{longtable}\n\\usepackage{booktabs}" :order 2)
     (cleveref      :snippet "\\usepackage[capitalize]{cleveref}" :order 1) ; after bmc-maths
