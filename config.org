@@ -1413,7 +1413,7 @@ I prefer the dashboard, so let's ensure that's always switched to in new frames.
 (when (daemonp)
   (add-hook 'emacs-startup-hook #'greedily-do-daemon-setup)
   (add-hook! 'server-after-make-frame-hook
-    (unless (string-match-p "\\*draft" (buffer-name))
+    (unless (string-match-p "\\*draft\\|\\*stdin\\|emacs-everywhere" (buffer-name))
       (switch-to-buffer +doom-dashboard-name))))
 #+end_src
 *** Emacs client wrapper
@@ -1782,8 +1782,9 @@ One little thing I want to add is some per-project commit message templates.
 (after! magit
   (defun +magit-fill-in-commit-template ()
     "Insert template from `+magit-fill-in-commit-template' if applicable."
-    (when-let ((template (cdr (assoc (file-name-base (directory-file-name (magit-toplevel)))
-                                     +magit-project-commit-templates-alist))))
+    (when-let ((template (and (save-excursion (goto-char (point-min)) (string-match-p "\\`\\s-*$" (thing-at-point 'line)))
+                              (cdr (assoc (file-name-base (directory-file-name (magit-toplevel)))
+                                          +magit-project-commit-templates-alist)))))
       (goto-char (point-min))
       (insert (if (stringp template) template (funcall template)))
       (goto-char (point-min))
@@ -1805,7 +1806,6 @@ follow [[https://orgmode.org/worg/org-contribute.html#commit-messages][a certain
                 magit-git-global-arguments
                 (list "diff" "--cached")))
         (goto-char (point-min))
-        (message "%s" (buffer-string))
         (while (re-search-forward "^@@\\|^\\+\\+\\+ b/" nil t)
           (if (looking-back "^\\+\\+\\+ b/" (line-beginning-position))
               (progn
@@ -2279,18 +2279,6 @@ lightened versions --- let's do that.
      (face-attribute 'default :foreground))))
 #+end_src
 
-Let's automatically update terminals on theme change (as long as ~pywal~ is available).
-
-Unfortunately, as the theme is set on startup this causes the hook to be run
-immediately. It would be nicer to /not/ have this add to our precious startup
-time (around 0.4s last time I checked).
-We can achieve this by deferring it with a short idle timer that should add the
-hook /just after/ initialisation.
-
-#+begin_src emacs-lisp :tangle (if (executable-find "wal") "yes" "no")
-(run-with-idle-timer 0.1 nil (lambda () (add-hook 'doom-load-theme-hook 'theme-magic-from-emacs)))
-#+end_src
-
 *** Emojify
 #+begin_quote
 From the =:ui emoji= module.
@@ -2318,7 +2306,9 @@ table
     ;; Terminal powerline
     "✔"
     ;; Box drawing
-    "▶" "◀")
+    "▶" "◀"
+    ;; I just want to see this as text
+    "©" "™")
   "Characters that should never be affected by `emojify-mode'.")
 
 (defadvice! emojify-delete-from-data ()
@@ -2611,7 +2601,7 @@ We want to make the tabs a nice, comfy size (~36~), with icons. The modifier
 marker is nice, but the particular default Unicode one causes a lag spike, so
 let's just switch to an ~o~, which still looks decent but doesn't cause any
 issues.
-A 'active-bar' is nice, so let's have one of those. If we have it ~under~ needs us to
+An 'active-bar' is nice, so let's have one of those. If we have it ~under~ needs us to
 turn on ~x-underline-at-decent~ though. For some reason this didn't seem to work
 inside the src_elisp{(after! ... )} block ¯\_(ツ)_/¯.
 Then let's change the font to a sans serif, but the default one doesn't fit too
@@ -4569,12 +4559,27 @@ current message on https://list.orgmode.org.
   (add-to-list 'mu4e-view-actions (cons "link to message ML" #'+mu4e-ml-message-link) t))
 #+end_src
 
+In a similar manner, when clicking on such a link (say when someone uses a link
+to the archive to refer to an earlier email) I'd much rather look at it in mu4e.
+
+#+begin_src emacs-lisp
+(defun +browse-url-orgmode-ml (url &optional _)
+  "Open an orgmode list url using notmuch."
+  (let ((id (and (or (string-match "^https?://orgmode\\.org/list/\\([^/]+\\)" url)
+                     (string-match "^https?://list\\.orgmode\\.org/\\([^/]+\\)" url))
+                 (match-string 1 url))))
+    (mu4e-view-message-with-message-id id)))
+
+(add-to-list 'browse-url-handlers (cons "^https?://orgmode\\.org/list" #'+browse-url-orgmode-ml))
+(add-to-list 'browse-url-handlers (cons "^https?://list\\.orgmode\\.org/" #'+browse-url-orgmode-ml))
+#+end_src
+
 *** Org Msg
 Doom does a fantastic stuff with the defaults with this, so we only make a few
 minor tweaks.
 #+begin_src emacs-lisp
 (setq +org-msg-accent-color "#1a5fb4"
-      org-msg-greeting-fmt "\nHi %s,\n\n"
+      org-msg-greeting-fmt "\nHi%s,\n\n"
       org-msg-signature "\n\n#+begin_signature\nAll the best,\\\\\n@@html:<b>@@Timothy@@html:</b>@@\n#+end_signature")
 (map! :map org-msg-edit-mode-map
       :after org-msg
@@ -7063,7 +7068,7 @@ Since I (roughly) track Org ~HEAD~, it makes sense to include the git version in
 the creator string.
 #+begin_src emacs-lisp
 (setq org-export-creator-string
-      (format "Emacs %s (Org mode %s %s)" emacs-version (org-release) (org-git-version)))
+      (format "Emacs %s (Org mode %s–%s)" emacs-version (org-release) (org-git-version)))
 #+end_src
 
 **** Acronym formatting
@@ -7980,10 +7985,9 @@ Now let's just sprinkle some KOMA all over the Org LaTeX classes.
 The =hyperref= setup needs to be handled separately however.
 #+name: latex-fancy-hyperref
 #+begin_src LaTeX
-\\colorlet{greenyblue}{blue!70!green}
-\\colorlet{blueygreen}{blue!40!green}
-\\providecolor{link}{named}{greenyblue}
-\\providecolor{cite}{named}{blueygreen}
+\\providecolor{url}{HTML}{0077bb}
+\\providecolor{link}{HTML}{882255}
+\\providecolor{cite}{HTML}{999933}
 \\hypersetup{
   pdfauthor={%a},
   pdftitle={%t},
@@ -7993,8 +7997,8 @@ The =hyperref= setup needs to be handled separately however.
   pdflang={%L},
   breaklinks=true,
   colorlinks=true,
-  linkcolor=,
-  urlcolor=link,
+  linkcolor=link,
+  urlcolor=url,
   citecolor=cite\n}
 \\urlstyle{same}
 #+end_src
@@ -8055,20 +8059,33 @@ A LaTeX macro should make them trivial to create.
 
 #+name: org-latex-box-preamble
 #+begin_src LaTeX
-% args = #1 Name, #2 Colour, #3 Ding, #4 Label
-\\newcommand{\\defsimplebox}[4]{%
-  \\definecolor{#1}{HTML}{#2}
-  \\newenvironment{#1}[1][]
-  {%
+\\ExplSyntaxOn
+\\NewCoffin\\Content
+\\NewCoffin\\SideRule
+\\NewDocumentCommand{\\defsimplebox}{O{\\ding{117}} O{0.36em} m m m}{%
+  % #1 ding, #2 ding offset, #3 name, #4 colour, #5 default label
+  \\definecolor{#3}{HTML}{#4}
+  \\NewDocumentEnvironment{#3}{ O{#5} }
+  {
+    \\vcoffin_set:Nnw \\Content { \\linewidth }
+    \\noindent \\ignorespaces
     \\par\\vspace{-0.7\\baselineskip}%
-    \\textcolor{#1}{#3} \\textcolor{#1}{\\textbf{\\def\\temp{##1}\\ifx\\temp\\empty#4\\else##1\\fi}}%
+    \\textcolor{#3}{#1}~\\textcolor{#3}{\\textbf{##1}}%
     \\vspace{-0.8\\baselineskip}
     \\begin{addmargin}[1em]{1em}
-  }{%
+    }
+    {
     \\end{addmargin}
     \\vspace{-0.5\\baselineskip}
-  }%
+    \\vcoffin_set_end:
+    \\SetHorizontalCoffin\\SideRule{\\color{#3}\\rule{1pt}{\\CoffinTotalHeight\\Content}}
+    \\JoinCoffins*\\Content[l,t]\\SideRule[l,t](#2,-0.7em)
+    \\noindent\\TypesetCoffin\\Content
+    \\vspace*{\\CoffinTotalHeight\\Content}\\bigskip
+    \\vspace{-2\\baselineskip}
+  }
 }
+\\ExplSyntaxOff
 #+end_src
 
 Lastly, we will pass this content into some global variables we for ease of
@@ -8209,8 +8226,8 @@ tests should be very versatile.
   "Vertically seperate paragraphs, and remove indentation.")
 
 (defvar org-latex-conditional-features
-  '(("\\[\\[\\(?:file\\|https?\\):\\(?:[^]]\\|\\\\\\]\\)+?\\.\\(?:eps\\|pdf\\|png\\|jpeg\\|jpg\\|jbig2\\)\\]\\]" . image)
-    ("\\[\\[\\(?:file\\|https?\\):\\(?:[^]]+?\\|\\\\\\]\\)\\.svg\\]\\]" . svg)
+  '(("\\[\\[\\(?:file\\|https?\\):\\(?:[^]]\\|\\\\\\]\\)+?\\.\\(?:eps\\|pdf\\|png\\|jpeg\\|jpg\\|jbig2\\)\\]\\]\\|\\\\includegraphics[\\[{]" . image)
+    ("\\[\\[\\(?:file\\|https?\\):\\(?:[^]]+?\\|\\\\\\]\\)\\.svg\\]\\]\\|\\\\includesvg[\\[{]" . svg)
     ("\\\\(\\|\\\\\\[\\|\\\\begin{\\(?:math\\|displaymath\\|equation\\|align\\|flalign\\|multiline\\|gather\\)[a-z]*\\*?}" . maths)
     ("^[ \t]*|" . table)
     ("cref:\\|\\cref{\\|\\[\\[[^\\]+\n?[^\\]\\]\\]" . cleveref)
@@ -8293,16 +8310,17 @@ introduce an =:order= keyword. Using this I'll arrange snippets as follows.
     (italic-quotes :snippet "\\renewcommand{\\quote}{\\list{}{\\rightmargin\\leftmargin}\\item\\relax\\em}\n" :order 0.5)
     (par-sep       :snippet "\\setlength{\\parskip}{\\baselineskip}\n\\setlength{\\parindent}{0pt}\n" :order 0.5)
     (.pifont       :snippet "\\usepackage{pifont}")
+    (.xcoffins     :snippet "\\usepackage{xcoffins}")
     (checkbox      :requires .pifont :order 3
                    :snippet (concat (unless (memq 'maths features)
                                       "\\usepackage{amssymb} % provides \\square")
                                     org-latex-checkbox-preamble))
-    (.fancy-box    :requires .pifont    :snippet org-latex-box-preamble :order 3.9)
-    (box-warning   :requires .fancy-box :snippet "\\defsimplebox{warning}{e66100}{\\ding{68}}{Warning}" :order 4)
-    (box-info      :requires .fancy-box :snippet "\\defsimplebox{info}{3584e4}{\\ding{68}}{Information}" :order 4)
-    (box-notes     :requires .fancy-box :snippet "\\defsimplebox{notes}{26a269}{\\ding{43}}{Notes}" :order 4)
-    (box-success   :requires .fancy-box :snippet "\\defsimplebox{success}{26a269}{\\ding{68}}{\\vspace{-\\baselineskip}}" :order 4)
-    (box-error     :requires .fancy-box :snippet "\\defsimplebox{error}{c01c28}{\\ding{68}}{Important}" :order 4))
+    (.fancy-box    :requires (.pifont .xcoffins) :snippet org-latex-box-preamble :order 3.9)
+    (box-warning   :requires .fancy-box :snippet "\\defsimplebox{warning}{e66100}{Warning}" :order 4)
+    (box-info      :requires .fancy-box :snippet "\\defsimplebox{info}{3584e4}{Information}" :order 4)
+    (box-notes     :requires .fancy-box :snippet "\\defsimplebox{notes}{26a269}{Notes}" :order 4)
+    (box-success   :requires .fancy-box :snippet "\\defsimplebox{success}{26a269}{\\vspace{-\\baselineskip}}" :order 4)
+    (box-error     :requires .fancy-box :snippet "\\defsimplebox{error}{c01c28}{Important}" :order 4))
   "LaTeX features and details required to implement them.
 
 List where the car is the feature symbol, and the rest forms a plist with the
@@ -8321,8 +8339,7 @@ following keys:
 - :prevents, a feature or list of features that should be masked
 - :order, for when ordering is important. Lower values appear first.
     The default is 0.
-
-Features that start with ! will be eagerly loaded, i.e. without being detected.")
+- :eager, when non-nil the feature will be eagerly loaded, i.e. without being detected.")
 #+end_src
 
 ***** Feature determination
@@ -8374,7 +8391,8 @@ following steps.
   "For each feature in FEATURES process :requires, :when, and :prevents keywords and sort according to :order."
   (dolist (feature features)
     (unless (assoc feature org-latex-feature-implementations)
-      (error "Feature %s not provided in org-latex-feature-implementations" feature)))
+      (message "Feature %s not provided in org-latex-feature-implementations, ignoring." feature)
+      (setq features (remove feature features))))
   (setq current features)
   (while current
     (when-let ((requirements (plist-get (cdr (assq (car current) org-latex-feature-implementations)) :requires)))
@@ -8582,9 +8600,9 @@ Finally, we just need to add some fonts.
      :mono "\\usepackage[scale=0.95]{plex-mono}"
      :maths "\\usepackage{newtxmath}") ; may be plex-based in future
     (source
-     :serif "\\usepackage[osf]{sourceserifpro}"
-     :sans "\\usepackage[osf]{sourcesanspro}"
-     :mono "\\usepackage[scale=0.95]{sourcecodepro}"
+     :serif "\\usepackage[osf,semibold]{sourceserifpro}"
+     :sans "\\usepackage[osf,semibold]{sourcesanspro}"
+     :mono "\\usepackage[scale=0.92]{sourcecodepro}"
      :maths "\\usepackage{newtxmath}") ; may be sourceserifpro-based in future
     (times
      :serif "\\usepackage{newtxtext}"
@@ -8751,9 +8769,10 @@ much space it puts between list items by default. I'm generally not a fan.
 Thankfully this is easy to correct with a small snippet:
 #+name: latex-condense-lists
 #+begin_src LaTeX
-\\let\\olditem\\itemize\\renewcommand{\\itemize}{\\olditem\\setlength{\\itemsep}{-2ex}}
-\\let\\oldenum\\enumerate\\renewcommand{\\enumerate}{\\oldenum\\setlength{\\itemsep}{-2ex}}
-\\let\\olddesc\\description\\renewcommand{\\description}{\\olddesc\\setlength{\\itemsep}{-2ex}}
+\\newcommand{\\setuplistspacing}{\\setlength{\\itemsep}{-0.5ex}\\setlength{\\parskip}{1.5ex}\\setlength{\\parsep}{0pt}}
+\\let\\olditem\\itemize\\renewcommand{\\itemize}{\\olditem\\setuplistspacing}
+\\let\\oldenum\\enumerate\\renewcommand{\\enumerate}{\\oldenum\\setuplistspacing}
+\\let\\olddesc\\description\\renewcommand{\\description}{\\olddesc\\setuplistspacing}
 #+end_src
 
 Then we can just hook this in with our clever preamble.
@@ -8937,6 +8956,7 @@ better) we add bit to the preamble:
 
 \\definecolor{codebackground}{HTML}{f7f7f7}
 \\definecolor{codeborder}{HTML}{f0f0f0}
+\\providecolor{EFD}{HTML}{28292e}
 
 % TODO have code boxes keep line vertical alignment
 \\usepackage[breakable,xparse]{tcolorbox}
@@ -8951,6 +8971,17 @@ better) we add bit to the preamble:
     boxrule=0pt, leftrule=1.5pt, left=0.5pt},
   right=2pt, top=1pt, bottom=0.5pt,
   breakable}
+#+end_src
+
+One little annoyance with this is the interaction between microtype and =Verbatim=
+environments. Protrusion is not desirable here. Thankfully, we can patch the
+=Verbatim= environment to turn off protrusion locally.
+#+begin_src emacs-lisp
+(add-to-list 'org-latex-feature-implementations
+             '(.no-protrusion-in-code :snippet "\\let\\oldcode\\Code\\renewcommand{\\Code}{\\microtypesetup{protrusion=false}\\oldcode}"
+                                      :when (microtype engraved-code-setup)
+                                      :eager t
+                                      :order 98.5) t)
 #+end_src
 
 At some point it would be nice to make the box colours easily customisable. At
@@ -10083,13 +10114,13 @@ Maths deliminators can be de-emphasised a bit
 
 (font-lock-add-keywords
  'latex-mode
- `((,(rx (and "\\" (any "()[]"))) 0 'unimportant-latex-face prepend))
+ `(("\\\\[]()[]" 0 'unimportant-latex-face prepend))
  'end)
 
-(font-lock-add-keywords
- 'latex-mode
- `((,"\\\\[[:word:]]+" 0 'font-lock-keyword-face prepend))
- 'end)
+;; (font-lock-add-keywords
+;;  'latex-mode
+;;  '(("\\\\[[:word:]]+" 0 'font-lock-keyword-face prepend))
+;;  'end)
 #+end_src
 
 And enable shell escape for the preview
