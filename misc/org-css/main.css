@@ -112,7 +112,7 @@ summary {
   --switch-icon: "🌝";
   --switch-shadow-color: #fce477;
   --switch-text: "light mode?"; }
-  #theme-switch:checked ~ #page img.invertible, #theme-switch:checked ~ #page object.invertible[type="image/svg+xml"] {
+  #theme-switch:checked ~ #page img.invertible, #theme-switch:checked ~ #page object[type="image/svg+xml"].invertible {
     filter: invert(90%) hue-rotate(180deg) sepia(1%); }
 
 #theme-switch {
@@ -239,10 +239,10 @@ body {
     margin-bottom: 10px;
     margin-top: 10px;
     text-transform: none; }
-    .page-header h1 .subtitle {
-      font-size: 24px;
-      color: var(--text-light);
-      margin: 0; }
+  .page-header .subtitle {
+    font-size: 24px;
+    color: var(--text-light);
+    margin: 0; }
 
 .page-meta {
   font-family: "Open Sans", sans;
@@ -613,6 +613,7 @@ kbd {
   display: inline-block;
   padding: 0.25em 0.35em;
   font: 80% SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+  font-weight: inherit;
   line-height: normal;
   line-height: 80%;
   color: var(--text-gray);
@@ -632,7 +633,7 @@ details.code {
   position: relative; }
   details.code summary {
     position: relative;
-    left: -3px;
+    left: -2.5px;
     padding-left: 10px;
     padding-bottom: 4px;
     margin-left: -10px;
