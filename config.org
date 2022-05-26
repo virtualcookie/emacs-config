@@ -677,7 +677,6 @@ markdown                     ; writing docs for people to ignore
 ;;nix                        ; I hereby declare "nix geht mehr!"
 ;;ocaml                      ; an objective camel
 (org                         ; organize your plain life in plain text
- +pretty                     ; yessss my pretties! (nice unicode symbols)
  +dragndrop                  ; drag & drop files/images into org buffers
  ;;+hugo                     ; use Emacs for hugo blogging
  +noter                      ; enhanced PDF notetaking
@@ -2285,7 +2284,7 @@ welcomed into Emacs 28. However, he is also rather attentive with updates, and
 so I'd like to make sure we have a recent version.
 
 #+begin_src emacs-lisp :tangle packages.el
-(package! modus-themes :pin "a42c1710389eab741bb2921b575e3fa7b678eddd")
+(package! modus-themes :pin "810a035768085167440c07f99bd7b64e6894d1b7")
 #+end_src
 
 *** Theme magic
@@ -2721,15 +2720,16 @@ tweaks. Namely:
 + Hiding line numbers
 + Removing outline indentation
 + Centring the text
-+ Turning on ~org-pretty-table-mode~
 
 #+begin_src emacs-lisp
 (defvar +zen-serif-p t
   "Whether to use a serifed font with `mixed-pitch-mode'.")
+(defvar +zen-org-starhide t
+  "The value `org-modern-hide-stars' is set to.")
+
 (after! writeroom-mode
   (defvar-local +zen--original-org-indent-mode-p nil)
   (defvar-local +zen--original-mixed-pitch-mode-p nil)
-  (defvar-local +zen--original-org-pretty-table-mode-p nil)
   (defun +zen-enable-mixed-pitch-mode-h ()
     "Enable `mixed-pitch-mode' when in `+zen-mixed-pitch-modes'."
     (when (apply #'derived-mode-p +zen-mixed-pitch-modes)
@@ -2742,8 +2742,9 @@ tweaks. Namely:
             'display-line-numbers
             'visual-fill-column-width
             'org-adapt-indentation
-            'org-superstar-headline-bullets-list
-            'org-superstar-remove-leading-stars)
+            'org-modern-mode
+            'org-modern-star
+            'org-modern-hide-stars)
   (add-hook 'writeroom-mode-enable-hook
             (defun +zen-prose-org-h ()
               "Reformat the current Org buffer appearance for prose."
@@ -2751,25 +2752,23 @@ tweaks. Namely:
                 (setq display-line-numbers nil
                       visual-fill-column-width 60
                       org-adapt-indentation nil)
-                (when (featurep 'org-superstar)
-                  (setq-local org-superstar-headline-bullets-list '("🙘" "🙙" "🙚" "🙛")
-                              ;; org-superstar-headline-bullets-list '("🙐" "🙑" "🙒" "🙓" "🙔" "🙕" "🙖" "🙗")
-                              org-superstar-remove-leading-stars t)
-                  (org-superstar-restart))
+                (when (featurep 'org-modern)
+                  (setq-local org-modern-star '("🙘" "🙙" "🙚" "🙛")
+                              ;; org-modern-star '("🙐" "🙑" "🙒" "🙓" "🙔" "🙕" "🙖" "🙗")
+                              org-modern-hide-stars +zen-org-starhide)
+                  (org-modern-mode -1)
+                  (org-modern-mode 1))
                 (setq
                  +zen--original-org-indent-mode-p org-indent-mode
-                 +zen--original-org-pretty-table-mode-p (bound-and-true-p org-pretty-table-mode))
-                (org-indent-mode -1)
-                (org-pretty-table-mode 1))))
-  (add-hook 'writeroom-mode-disable-hook
-            (defun +zen-nonprose-org-h ()
-              "Reverse the effect of `+zen-prose-org'."
-              (when (eq major-mode 'org-mode)
-                (when (featurep 'org-superstar)
-                  (org-superstar-restart))
-                (when +zen--original-org-indent-mode-p (org-indent-mode 1))
-                ;; (unless +zen--original-org-pretty-table-mode-p (org-pretty-table-mode -1))
-                ))))
+                 (org-indent-mode -1))))
+            (add-hook 'writeroom-mode-disable-hook
+                      (defun +zen-nonprose-org-h ()
+                        "Reverse the effect of `+zen-prose-org'."
+                        (when (eq major-mode 'org-mode)
+                          (when (bound-and-true-p org-modern-mode)
+                            (org-modern-mode -1)
+                            (org-modern-mode 1))
+                          (when +zen--original-org-indent-mode-p (org-indent-mode 1)))))))
 #+end_src
 
 #+attr_html: :class invertible :alt Writeroom applied to an Org file
@@ -3240,7 +3239,7 @@ For managing my ebooks, I'll hook into the well-established ebook library
 manager [[https://calibre-ebook.com/][calibre]]. A number of Emacs clients for this exist, but this seems like a
 good option.
 #+begin_src emacs-lisp :tangle packages.el
-(package! calibredb :pin "8a6148a264e5e57e11824a238ae7b92bb3b6c9ab")
+(package! calibredb :pin "232fa1cf3af08200af439d1cbb5a131f38286183")
 #+end_src
 
 Then for reading them, the only currently viable options seems to be [[https://depp.brause.cc/nov.el/][nov.el]].
@@ -4841,24 +4840,53 @@ correct package statement needed.
 (package! org-contrib
   :recipe (:host nil :repo "https://git.sr.ht/~bzg/org-contrib"
            :files ("lisp/*.el"))
-  :pin "e6cb6ca42f5bbb74825e81fd645b00e17a673da4")
+  :pin "15b03d5090cd6ef46bdfdd14a3f9e20c3dab60da")
 #+end_src
 
 **** Visuals
-***** Tables
+***** Org Modern
 
-Org tables aren't the prettiest thing to look at. This package is supposed to
-redraw them in the buffer with box-drawing characters. Sounds like an
-improvement to me! We'll make use of this with =writeroom-mode=.
+Fontifying =org-mode= buffers to be as pretty as possible is of paramount importance,
+and Minad's lovely =org-modern= goes a long way in this regard.
 
 #+begin_src emacs-lisp
-(package! org-pretty-table
-  :recipe (:host github :repo "Fuco1/org-pretty-table") :pin "7bd68b420d3402826fea16ee5099d04aa9879b78")
+(package! org-modern :pin "ff1046705b3950b7a49da50bc34c11da86c6226d")
 #+end_src
 
+...with a touch of configuration...
+
 #+begin_src emacs-lisp :tangle yes
-(use-package! org-pretty-table
-  :commands (org-pretty-table-mode global-org-pretty-table-mode))
+(use-package! org-modern
+  :hook (org-mode . org-modern-mode)
+  :config
+  (setq org-modern-star ["◉" "○" "✸" "✿" "✤" "✜" "◆" "▶"]
+        org-modern-table-vertical 1
+        org-modern-table-horizontal 0.2
+        org-modern-list '((43 . "➤")
+                          (45 . "–")
+                          (42 . "•"))
+        org-modern-todo-faces
+        '(("TODO" :inverse-video t :inherit org-todo)
+          ("PROJ" :inverse-video t :inherit +org-todo-project)
+          ("STRT" :inverse-video t :inherit +org-todo-active)
+          ("[-]"  :inverse-video t :inherit +org-todo-active)
+          ("HOLD" :inverse-video t :inherit +org-todo-onhold)
+          ("WAIT" :inverse-video t :inherit +org-todo-onhold)
+          ("[?]"  :inverse-video t :inherit +org-todo-onhold)
+          ("KILL" :inverse-video t :inherit +org-todo-cancel)
+          ("NO"   :inverse-video t :inherit +org-todo-cancel))
+        org-modern-block nil
+        org-modern-progress nil
+        org-modern-keyword nil)
+  (custom-set-faces! '(org-modern-statistics :inherit org-checkbox-statistics-todo)))
+#+end_src
+
+Since =org-modern='s tag face supplants Org's tag face, we need to adjust the
+spell-check face ignore list
+
+#+begin_src emacs-lisp
+(after! spell-fu
+  (pushnew 'org-modern-tag (alist-get 'org-mode +spell-excluded-faces-alist)))
 #+end_src
 
 ***** Emphasis markers
@@ -5196,7 +5224,7 @@ There's also the new =org-cite= though. It would be nice to try that out.
 To improve =org-cite=.
 
 #+begin_src emacs-lisp :noweb-ref none :tangle packages.el
-(package! citar :pin "b391e6de49e00cffa8f60a089a01d663b627a678")
+(package! citar :pin "d55cac7a2b8b848990ebd713de8667bf3fe93c6b")
 (package! citeproc :pin "ba49516265fa24b138346c4918d39d19b4de8a62")
 (package! org-cite-csl-activate :recipe (:host github :repo "andras-simonyi/org-cite-csl-activate") :pin "4fdb61c0f83b5d6db0d07dfd64d2a177fd46e931")
 #+end_src
@@ -5325,11 +5353,7 @@ want to edit them afterwards though, so let's make that happen by default.
 
 At some point in the future it could be good to investigate [[https://scripter.co/splitting-an-org-block-into-two/][splitting org blocks]].
 Likewise [[https://archive.casouri.cat/note/2020/insert-math-symbol-in-emacs/][this]] looks good for symbols.
-***** Spellcheck
-My spelling is atrocious, so let's get flycheck going.
-#+begin_src emacs-lisp
-(add-hook 'org-mode-hook 'turn-on-flyspell)
-#+end_src
+
 ***** LSP support in ~src~ blocks
 Now, by default, LSPs don't really function at all in ~src~ blocks.
 #+begin_src emacs-lisp
@@ -6488,7 +6512,6 @@ cause issues. Let's make their failure less eventful.
 #+begin_src emacs-lisp
 (defadvice! shut-up-org-problematic-hooks (orig-fn &rest args)
   :around #'org-fancy-priorities-mode
-  :around #'org-superstar-mode
   (ignore-errors (apply orig-fn args)))
 #+end_src
 **** Flycheck with org-lint
@@ -6690,12 +6713,8 @@ Doom theme's extra fontification is more problematic than helpful.
 It's also nice to change the character used for collapsed items (by default ~…~),
 I think ~▾~ is better for indicating 'collapsed section'.
 and add an extra ~org-bullet~ to the default list of four.
-I've also added some fun alternatives, just commented out.
-#+begin_src emacs-lisp
-(after! org-superstar
-  (setq org-superstar-headline-bullets-list '("◉" "○" "✸" "✿" "✤" "✜" "◆" "▶")
-        org-superstar-prettify-item-bullets t ))
 
+#+begin_src emacs-lisp
 (setq org-ellipsis " ▾ "
       org-hide-leading-stars t
       org-priority-highest ?A
@@ -6726,6 +6745,8 @@ It's also nice to make use of the Unicode characters for check boxes, and other 
             :options       "⌥"
             :startup       "⏻"
             :macro         "𝓜"
+            :bibliography  ""
+            :print_biblio  ""
             :html_head     "🅷"
             :html          "🅗"
             :latex_class   "🄻"
@@ -6767,6 +6788,8 @@ It's also nice to make use of the Unicode characters for check boxes, and other 
   :options       "#+options:"
   :startup       "#+startup:"
   :macro         "#+macro:"
+  :bibliography  "#+bibliography:"
+  :print_biblio  "#+print_bibliography:"
   :html_head     "#+html_head:"
   :html          "#+html:"
   :latex_class   "#+latex_class:"
@@ -6793,7 +6816,7 @@ It's also nice to make use of the Unicode characters for check boxes, and other 
 (plist-put +ligatures-extra-symbols :name "⁍")
 #+end_src
 
-~org-superstar-mode~ is great. While we're at it we may as well make tags prettier as well 🙂
+While we're at it we may as well make tags prettier as well 🙂
 #+begin_src emacs-lisp :tangle packages.el
 ;; (package! org-pretty-tags :pin "5c7521651b35ae9a7d3add4a66ae8cc176ae1c76")
 #+end_src
@@ -7210,6 +7233,32 @@ TODO abstract backend implementations."
    todo todo-type priority (org-export-filter-text-acronym text 'latex info) tags info))
 (setq org-latex-format-headline-function #'org-latex-format-headline-acronymised)
 #+end_src
+
+**** Exporting Org code
+
+With all our Org config and hooks, exporting an Org code block when using
+a font-lock based method can produce undesirable results. To address this, we
+can tweak ~+org-babel-mode-alist~ when exporting.
+
+#+begin_src emacs-lisp
+(defun +org-mode--fontlock-only-mode ()
+  "Just apply org-mode's font-lock once."
+  (let (org-mode-hook
+        org-hide-leading-stars
+        org-hide-emphasis-markers)
+    (org-set-font-lock-defaults)
+    (font-lock-ensure))
+  (setq-local major-mode #'fundamental-mode))
+
+(defun +org-export-babel-mask-org-config (_backend)
+  "Use `+org-mode--fontlock-only-mode' instead of `org-mode'."
+  (setq-local org-src-lang-modes
+              (append org-src-lang-modes
+                      (list (cons "org" #'+org-mode--fontlock-only)))))
+
+(add-hook 'org-export-before-processing-hook #'+org-export-babel-mask-org-config)
+#+end_src
+
 *** HTML Export
 :PROPERTIES:
 :header-args:emacs-lisp: :noweb-ref ox-html-conf
@@ -8316,6 +8365,7 @@ tests should be very versatile.
     ("^[ \t]*|" . table)
     ("cref:\\|\\cref{\\|\\[\\[[^\\]+\n?[^\\]\\]\\]" . cleveref)
     ("[;\\\\]?\\b[A-Z][A-Z]+s?[^A-Za-z]" . acronym)
+    ("[\u2500-\u259F]" . box-drawing)
     ("\\+[^ ].*[^ ]\\+\\|_[^ ].*[^ ]_\\|\\\\uu?line\\|\\\\uwave\\|\\\\sout\\|\\\\xout\\|\\\\dashuline\\|\\dotuline\\|\\markoverwith" . underline)
     (":float wrap" . float-wrap)
     (":float sideways" . rotate)
@@ -8391,6 +8441,7 @@ introduce an =:order= keyword. Using this I'll arrange snippets as follows.
     (embed-files   :snippet org-latex-embed-files-preamble :order -2)
     (embed-tangled :requires embed-files :snippet (concat (org-latex-embed-extra-files) "\n") :order -1)
     (acronym       :snippet "\\newcommand{\\acr}[1]{\\protect\\textls*[110]{\\scshape #1}}\n\\newcommand{\\acrs}{\\protect\\scalebox{.91}[.84]{\\hspace{0.15ex}s}}" :order 0.4)
+    (box-drawing   :snippet "\\usepackage{pmboxdraw}" :order 0.05)
     (italic-quotes :snippet "\\renewcommand{\\quote}{\\list{}{\\rightmargin\\leftmargin}\\item\\relax\\em}\n" :order 0.5)
     (par-sep       :snippet "\\setlength{\\parskip}{\\baselineskip}\n\\setlength{\\parindent}{0pt}\n" :order 0.5)
     (.pifont       :snippet "\\usepackage{pifont}")
@@ -8897,20 +8948,6 @@ entry in ~org-latex-scr-block~ we can easily add this as a recognised
 ~org-latex-listings~ value.
 
 #+begin_src emacs-lisp :noweb no-export
-(defadvice! org-latex-src-block-engraved (orig-fn src-block contents info)
-  "Like `org-latex-src-block', but supporting an engraved backend"
-  :around #'org-latex-src-block
-  (if (eq 'engraved (plist-get info :latex-listings))
-      (org-latex-scr-block--engraved src-block contents info)
-    (funcall orig-fn src-block contents info)))
-
-(defadvice! org-latex-inline-src-block-engraved (orig-fn inline-src-block contents info)
-  "Like `org-latex-inline-src-block', but supporting an engraved backend"
-  :around #'org-latex-inline-src-block
-  (if (eq 'engraved (plist-get info :latex-listings))
-      (org-latex-inline-scr-block--engraved inline-src-block contents info)
-    (funcall orig-fn src-block contents info)))
-
 (defvar-local org-export-has-code-p nil)
 
 (defadvice! org-export-expect-no-code (&rest _)
@@ -8918,152 +8955,21 @@ entry in ~org-latex-scr-block~ we can easily add this as a recognised
   (setq org-export-has-code-p nil))
 
 (defadvice! org-export-register-code (&rest _)
-  :after #'org-latex-src-block-engraved
+  :after #'org-latex-src-block
   :after #'org-latex-inline-src-block-engraved
   (setq org-export-has-code-p t))
-
-(setq org-latex-engraved-code-preamble "
-<<org-latex-engraved-code-preamble>>
-")
-
-(add-to-list 'org-latex-conditional-features '((and org-export-has-code-p "^[ \t]*#\\+begin_src\\|^[ \t]*#\\+BEGIN_SRC\\|src_[A-Za-z]") . engraved-code) t)
-(add-to-list 'org-latex-conditional-features '("^[ \t]*#\\+begin_example\\|^[ \t]*#\\+BEGIN_EXAMPLE" . engraved-code-setup) t)
-(add-to-list 'org-latex-feature-implementations '(engraved-code :requires engraved-code-setup :snippet (engrave-faces-latex-gen-preamble) :order 99) t)
-(add-to-list 'org-latex-feature-implementations '(engraved-code-setup :snippet org-latex-engraved-code-preamble :order 98) t)
-
-(defun org-latex-scr-block--engraved (src-block contents info)
-  (let* ((lang (org-element-property :language src-block))
-         (attributes (org-export-read-attribute :attr_latex src-block))
-         (float (plist-get attributes :float))
-         (num-start (org-export-get-loc src-block info))
-         (retain-labels (org-element-property :retain-labels src-block))
-         (caption (org-element-property :caption src-block))
-         (caption-above-p (org-latex--caption-above-p src-block info))
-         (caption-str (org-latex--caption/label-string src-block info))
-         (placement (or (org-unbracket-string "[" "]" (plist-get attributes :placement))
-                        (plist-get info :latex-default-figure-position)))
-         (float-env
-          (cond
-           ((string= "multicolumn" float)
-            (format "\\begin{listing*}[%s]\n%s%%s\n%s\\end{listing*}"
-                    placement
-                    (if caption-above-p caption-str "")
-                    (if caption-above-p "" caption-str)))
-           (caption
-            (format "\\begin{listing}[%s]\n%s%%s\n%s\\end{listing}"
-                    placement
-                    (if caption-above-p caption-str "")
-                    (if caption-above-p "" caption-str)))
-           ((string= "t" float)
-            (concat (format "\\begin{listing}[%s]\n"
-                            placement)
-                    "%s\n\\end{listing}"))
-           (t "%s")))
-         (options (plist-get info :latex-minted-options))
-         (content-buffer
-          (with-temp-buffer
-            (insert
-             (let* ((code-info (org-export-unravel-code src-block))
-                    (max-width
-                     (apply 'max
-                            (mapcar 'length
-                                    (org-split-string (car code-info)
-                                                      "\n")))))
-               (org-export-format-code
-                (car code-info)
-                (lambda (loc _num ref)
-                  (concat
-                   loc
-                   (when ref
-                     ;; Ensure references are flushed to the right,
-                     ;; separated with 6 spaces from the widest line
-                     ;; of code.
-                     (concat (make-string (+ (- max-width (length loc)) 6)
-                                          ?\s)
-                             (format "(%s)" ref)))))
-                nil (and retain-labels (cdr code-info)))))
-            (funcall (org-src-get-lang-mode lang))
-            (engrave-faces-latex-buffer)))
-         (content
-          (with-current-buffer content-buffer
-            (buffer-string)))
-         (body
-          (format
-           "\\begin{Code}\n\\begin{Verbatim}[%s]\n%s\\end{Verbatim}\n\\end{Code}"
-           ;; Options.
-           (concat
-            (org-latex--make-option-string
-             (if (or (not num-start) (assoc "linenos" options))
-                 options
-               (append
-                `(("linenos")
-                  ("firstnumber" ,(number-to-string (1+ num-start))))
-                options)))
-            (let ((local-options (plist-get attributes :options)))
-              (and local-options (concat "," local-options))))
-           content)))
-    (kill-buffer content-buffer)
-    ;; Return value.
-    (format float-env body)))
-
-(defun org-latex-inline-scr-block--engraved (inline-src-block _contents info)
-  (let ((options (org-latex--make-option-string
-                  (plist-get info :latex-minted-options)))
-        code-buffer code)
-    (setq code-buffer
-          (with-temp-buffer
-            (insert (org-element-property :value inline-src-block))
-            (funcall (org-src-get-lang-mode
-                      (org-element-property :language inline-src-block)))
-            (engrave-faces-latex-buffer)))
-    (setq code (with-current-buffer code-buffer
-                 (buffer-string)))
-    (kill-buffer code-buffer)
-    (format "\\Verb%s{%s}"
-            (if (string= options "") ""
-              (format "[%s]" options))
-            code)))
 #+end_src
 
 Whenever this is used, in order for it to actually work (and look a little
 better) we add bit to the preamble:
-
-#+name: org-latex-engraved-code-preamble
-#+begin_src LaTeX
-\\usepackage{fvextra}
-\\fvset{
-  commandchars=\\\\\\{\\},
-  highlightcolor=white!95!black!80!blue,
-  breaklines=true,
-  breaksymbol=\\color{white!60!black}\\tiny\\ensuremath{\\hookrightarrow}}
-\\renewcommand\\theFancyVerbLine{\\footnotesize\\color{black!40!white}\\arabic{FancyVerbLine}}
-
-\\definecolor{codebackground}{HTML}{f7f7f7}
-\\definecolor{codeborder}{HTML}{f0f0f0}
-\\providecolor{EFD}{HTML}{28292e}
-
-% TODO have code boxes keep line vertical alignment
-\\usepackage[breakable,xparse]{tcolorbox}
-\\DeclareTColorBox[]{Code}{o}%
-{colback=codebackground, colframe=codeborder,
-  fontupper=\\footnotesize,
-  colupper=EFD,
-  IfNoValueTF={#1}%
-  {boxsep=2pt, arc=2.5pt, outer arc=2.5pt,
-    boxrule=0.5pt, left=2pt}%
-  {boxsep=2.5pt, arc=0pt, outer arc=0pt,
-    boxrule=0pt, leftrule=1.5pt, left=0.5pt},
-  right=2pt, top=1pt, bottom=0.5pt,
-  breakable}
-#+end_src
 
 One little annoyance with this is the interaction between microtype and =Verbatim=
 environments. Protrusion is not desirable here. Thankfully, we can patch the
 =Verbatim= environment to turn off protrusion locally.
 #+begin_src emacs-lisp
 (add-to-list 'org-latex-feature-implementations
-             '(.no-protrusion-in-code :snippet "\\let\\oldcode\\Code\\renewcommand{\\Code}{\\microtypesetup{protrusion=false}\\oldcode}"
-                                      :when (microtype engraved-code-setup)
+             '(.no-protrusion-in-code :snippet "\\ifcsname Code\\endcsname\n  \\let\\oldcode\\Code\\renewcommand{\\Code}{\\microtypesetup{protrusion=false}\\oldcode}\n\\fi"
+                                      :when microtype
                                       :eager t
                                       :order 98.5) t)
 #+end_src
@@ -9165,6 +9071,7 @@ text property =emojified=.
 #+begin_src emacs-lisp
 (defun emojify-emoji-in-buffer-p ()
   "Determine if any emojis are present in the current buffer, using `emojify-mode'."
+  (require 'emojify)
   (unless emojify-mode
     (emojify-mode 1)
     (emojify-display-emojis-in-region (point-min) (point-max)))
@@ -9315,9 +9222,10 @@ don't appear in the pdf. It's preferable to see that there was /some/ character
 which wasn't displayed as opposed to nothing.
 
 We check every non-ascii character to make sure it's not a character encoded by
-the =inputenc= packages when loaded with the =utf8= option. Finally, we see if we
-have our own LaTeX conversion we can apply and if there is none we replace the
-non-ascii char with =¿=.
+the =inputenc= packages when loaded with the =utf8= option. We'll also allow
+box-drawing characters since they can be mostly supported with =pmboxdraw=.
+Finally, we see if we have our own LaTeX conversion we can apply and if there is
+none we replace the non-ascii char with =¿=.
 
 No to make sure we only remove characters that can't be displayed, we check
 =/usr/share/texmf/tex/latex/base/utf8enc.dfu=.
@@ -9327,7 +9235,7 @@ since we want to let emoji processing occur first.
 
 #+begin_src emacs-lisp
 (defvar +org-pdflatex-inputenc-encoded-chars
-  "[[:ascii:]\u00A0-\u01F0\u0218-\u021BȲȳȷˆˇ˜˘˙˛˝\u0400-\u04FFḂḃẞ\u200C\u2010-\u201E†‡•…‰‱‹›※‽⁄⁎⁒₡₤₦₩₫€₱℃№℗℞℠™Ω℧℮←↑→↓〈〉␢␣◦◯♪⟨⟩Ḡḡ\uFB00-\uFB06]")
+  "[[:ascii:]\u00A0-\u01F0\u0218-\u021BȲȳȷˆˇ˜˘˙˛˝\u0400-\u04FFḂḃẞ\u200C\u2010-\u201E†‡•…‰‱‹›※‽⁄⁎⁒₡₤₦₩₫€₱℃№℗℞℠™Ω℧℮←↑→↓〈〉␢␣◦◯♪⟨⟩Ḡḡ\uFB00-\uFB06\u2500-\u259F]")
 
 (defun +org-latex-replace-non-ascii-chars (text backend info)
   "Replace non-ascii chars with \\char\"XYZ forms."
