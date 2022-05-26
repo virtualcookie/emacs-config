@@ -4651,8 +4651,8 @@ Get the GCP client ID & the secret from environment variables
 (require 'org-gcal)
 (setq org-gcal-client-id (getenv "ORG_GCAL_CLIENT_ID")
       org-gcal-client-secret (getenv "ORG_GCAL_CLIENT_SECRET")
-      org-gcal-fetch-file-alist `((,(print (getenv "ORG_GCAL_CAL_ID_1")) . "~/orgfiles/org/cal-gmail.org")
-                                  (,(print (getenv "ORG_GCAL_CAL_ID_2")) . "~/orgfiles/org/cal-family.org")))
+      org-gcal-fetch-file-alist `((,(print (getenv "ORG_GCAL_CAL_ID_1")) . "~/orgfiles/org/nextcloud/Himanshu/cal-gmail.org")
+                                  (,(print (getenv "ORG_GCAL_CAL_ID_2")) . "~/orgfiles/org/nextcloud/Family/cal-family.org")))
 #+end_src
 * Language configuration
 ** General
@@ -5547,7 +5547,11 @@ set up org-capture.
   (setq doct-after-conversion-functions '(+doct-iconify-capture-templates))
 
   ;; (defvar +org-capture-recipies  "~/Desktop/TEC/Organisation/recipies.org")
-  (defvar +org-capture-recipies  "~/orgfiles/org/personal/household/cookbook.org")
+  (defvar +org-capture-recipies  "~/orgfiles/org/nextcloud/Family/recipies.org")
+
+  (setq +org-capture-todo-file "~/orgfiles/org/nextcloud/Himanshu/todo.org")
+
+  (setq org-default-notes-file "~/orgfiles/org/nextcloud/Himanshu/notes.org")
 
   (defun set-org-capture-templates ()
     (setq org-capture-templates
