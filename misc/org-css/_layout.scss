@@ -13,7 +13,8 @@ body {
 
 #page {
   color: $text-dark;
-  background-color: $back-light;
+  // background-color: $back-light;
+  background-color: $back-white;
   transition-property: color, background-color;
   transition-duration: 100ms;
 }

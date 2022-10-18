@@ -120,3 +120,15 @@ span.acr {
     min-width: 35%;
   }
 }
+
+.message,
+.MESSAGE {
+  background: rgba(58,129,195,.15);
+  border: 10px groove yellowgreen;
+  margin: 1.8rem 0 1.25rem 15px;
+  padding: 0.8em;
+  line-height: 1.4;
+  text-align: left;
+  position: relative;
+  clear: both;
+}
