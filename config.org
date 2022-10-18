@@ -1701,7 +1701,7 @@ nix                          ; I hereby declare "nix geht mehr!"
  +jupyter                    ; ipython/jupyter support for babel
  +pandoc                     ; export-with-pandoc support
  +gnuplot                    ; who doesn't like pretty pictures
- ;;+pomodoro                 ; be fruitful with the tomato technique
+ +pomodoro                 ; be fruitful with the tomato technique
  +present                    ; using org-mode for presentations
  +roam2)                     ; wander around notes
 ;;php                        ; perl's insecure younger brother
@@ -4052,6 +4052,125 @@ That's no problem though, we just need to help TRAMP find them.
               "/run/current-system/profile/sbin")))
 
 #+end_src
+*** ob-dsq
+https://github.com/fritzgrabo/ob-dsq
+Babel functions for the dsq CLI tool by Multiprocess Labs. ❤️
+
+dsq is a command-line tool for running SQL queries against JSON, CSV, Excel, Parquet, and more.
+
+This package adds Org tables, Org quotes and Org source block results to this list.
+#+begin_src emacs-lisp :tangle packages.el
+(package! ob-dsq)
+#+end_src
+
+#+begin_src emacs-lisp :tangle packages.el
+(use-package! ob-dsq)
+#+end_src
+*** Denote
+https://protesilaos.com/emacs/denote
+#+begin_src emacs-lisp :tangle packages.el
+(package! denote)
+#+end_src
+
+#+begin_src emacs-lisp :tangle packages.el
+(use-package! denote
+  :after org
+  :config
+  (setq denote-directory (expand-file-name "denotes" org-directory)
+        denote-date-prompt-use-org-read-date t)
+  (add-hook 'dired-mode-hook #'denote-dired-mode))
+
+#+end_src
+
+Notes migrator
+https://github.com/bitspook/notes-migrator
+#+begin_src emacs-lisp :tangle packages.el
+(package! notes-migrator :recipe (:host github :repo "bitspook/notes-migrator"))
+
+(use-package! notes-migrator
+  :after denote)
+#+end_src
+
+*** Org Drill
+#+begin_src emacs-lisp :tangle packages.el
+(package! org-drill)
+#+end_src
+
+*** Org ql (query language)
+https://github.com/alphapapa/org-ql
+An Org-mode query language, including search commands and saved views
+
+#+begin_src emacs-lisp :tangle packages.el
+(package! org-ql
+  :recipe (:host github :repo "alphapapa/org-ql"          
+           :files (:defaults (:exclude "helm-org-ql.el"))))
+
+(use-package! org-ql
+  :after org)
+#+end_src
+
+*** Roam tools
+Some tools for roam
+https://github.com/chrisbarrett/nursery
+
+#+begin_src emacs-lisp :tangle packages.el
+(package! org-roam-nursery
+  :recipe (:host github :repo "chrisbarrett/nursery"
+           :files ("lisp/*.el")))
+(use-package! org-roam-nursery
+  :after org-roam)
+#+end_src
+
+#+begin_src emacs-lisp :tangle packages.el
+(use-package org-roam-review
+  :commands (org-roam-review
+             org-roam-review-list-by-maturity
+             org-roam-review-list-recently-added)
+
+  ;; ;; Optional - tag all newly-created notes as seedlings.
+  ;; :hook (org-roam-capture-new-node . org-roam-review-set-seedling)
+
+  ;; ;; Optional - keybindings for applying Evergreen note properties.
+  ;; :general
+  ;; (:keymaps 'org-mode-map
+  ;; "C-c r r" '(org-roam-review-accept :wk "accept")
+  ;; "C-c r u" '(org-roam-review-bury :wk "bury")
+  ;; "C-c r x" '(org-roam-review-set-excluded :wk "set excluded")
+  ;; "C-c r b" '(org-roam-review-set-budding :wk "set budding")
+  ;; "C-c r s" '(org-roam-review-set-seedling :wk "set seedling")
+  ;; "C-c r e" '(org-roam-review-set-evergreen :wk "set evergreen"))
+
+  ;; ;; Optional - bindings for evil-mode compatability.
+  ;; :general
+  ;; (:states '(normal) :keymaps 'org-roam-review-mode-map
+  ;; "TAB" 'magit-section-cycle
+  ;; "g r" 'org-roam-review-refresh)
+  )
+
+(use-package org-roam-search
+  :commands (org-roam-search))
+
+(use-package org-roam-links
+  :commands (org-roam-links))
+
+(use-package org-roam-dblocks
+  :hook (org-mode . org-roam-dblocks-autoupdate-mode))
+
+(use-package org-roam-rewrite
+  :commands (org-roam-rewrite-rename
+             org-roam-rewrite-remove
+             org-roam-rewrite-inline
+             org-roam-rewrite-extract))
+
+(use-package org-roam-slipbox
+  :after org-roam
+  :demand t
+  :config
+  (org-roam-slipbox-buffer-identification-mode +1)
+  (org-roam-slipbox-tag-mode +1))
+
+#+end_src
+
 ** Visuals
 *** Info colours
 
@@ -4093,6 +4212,11 @@ so I'd like to make sure we have a recent version.
 
 #+begin_src emacs-lisp :tangle packages.el
 (package! spacemacs-theme :pin "1ec73d68b0f120f92538d9a329a3a46e32f74510")
+#+end_src
+
+*** ef-themes
+#+begin_src emacs-lisp :tangle packages.el
+(package! ef-themes :recipe (:host github :repo "protesilaos/ef-themes"))
 #+end_src
 
 *** Theme magic
@@ -10010,7 +10134,7 @@ theme-appropriate foreground.
 We can either render from a ~dvi~ or ~pdf~ file, so let's benchmark ~latex~ and
 ~pdflatex~.
 | ~latex~ time | ~pdflatex~ time |
-|------------+---------------|
+|--------------+-----------------|
 | 135 \pm 2 ms | 215 \pm 3 ms    |
 
 On the rendering side, there are two ~.dvi~-to-image converters which I am
@@ -10018,7 +10142,7 @@ interested in: ~dvipng~ and ~dvisvgm~.
 
 Using the above latex expression and benchmarking lead to the following results:
 | ~dvipng~ time | ~dvisvgm~ time | ~pdf2svg~ time |
-|-------------+--------------+--------------|
+|---------------+----------------+----------------|
 | 89 \pm 2 ms   | 178 \pm 2 ms   | 12 \pm 2 ms    |
 
 Now let's combine this to see what's best
@@ -12639,51 +12763,51 @@ Now, there are some symbols that aren't included in =inputenc=, but we should be
 able to handle anyway. For them we define a table of LaTeX translations
 
 #+name: latex-non-ascii-char-substitutions
-| Character | LaTeX |
-|-----------+-------|
-| ɑ         | \(\alpha\) |
-| β         | \(\beta\) |
-| γ         | \(\gamma\) |
-| δ         | \(\delta\) |
-| ε         | \(\epsilon\) |
-| ϵ         | \(\varepsilon\) |
-| ζ         | \(\zeta\) |
-| η         | \(\eta\) |
-| θ         | \(\theta\) |
-| ϑ         | \(\vartheta\) |
-| ι         | \(\iota\) |
-| κ         | \(\kappa\) |
-| λ         | \(\lambda\) |
-| μ         | \(\mu\) |
-| ν         | \(\nu\) |
-| ξ         | \(\xi\) |
-| π         | \(\pi\) |
-| ϖ         | \(\varpi\) |
-| ρ         | \(\rho\) |
-| ϱ         | \(\varrho\) |
-| σ         | \(\sigma\) |
-| ς         | \(\varsigma\) |
-| τ         | \(\tau\) |
-| υ         | \(\upsilon\) |
-| ϕ         | \(\phi\) |
-| φ         | \(\varphi\) |
-| ψ         | \(\psi\) |
-| ω         | \(\omega\) |
-| Γ         | \(\Gamma\) |
-| Δ         | \(\Delta\) |
-| Θ         | \(\Theta\) |
-| Λ         | \(\Lambda\) |
-| Ξ         | \(\Xi\) |
-| Π         | \(\Pi\) |
-| Σ         | \(\Sigma\) |
-| Υ         | \(\Upsilon\) |
-| Φ         | \(\Phi\) |
-| Ψ         | \(\Psi\) |
-| Ω         | \(\Omega\) |
-| א         | \(\aleph\) |
-| ב         | \(\beth\) |
-| ד         | \(\daleth\) |
-| ג         | \(\gimel\) |
+| Character | LaTeX           |
+|-----------+-----------------|
+| ɑ         | \(\alpha\)      |
+| β          | \(\beta\)       |
+| γ          | \(\gamma\)      |
+| δ          | \(\delta\)      |
+| ε          | \(\epsilon\)    |
+| ϵ          | \(\varepsilon\) |
+| ζ          | \(\zeta\)       |
+| η          | \(\eta\)        |
+| θ         | \(\theta\)      |
+| ϑ          | \(\vartheta\)   |
+| ι          | \(\iota\)       |
+| κ          | \(\kappa\)      |
+| λ          | \(\lambda\)     |
+| μ          | \(\mu\)         |
+| ν          | \(\nu\)         |
+| ξ          | \(\xi\)         |
+| π         | \(\pi\)         |
+| ϖ         | \(\varpi\)      |
+| ρ          | \(\rho\)        |
+| ϱ          | \(\varrho\)     |
+| σ          | \(\sigma\)      |
+| ς          | \(\varsigma\)   |
+| τ          | \(\tau\)        |
+| υ          | \(\upsilon\)    |
+| ϕ         | \(\phi\)        |
+| φ         | \(\varphi\)     |
+| ψ         | \(\psi\)        |
+| ω         | \(\omega\)      |
+| Γ          | \(\Gamma\)      |
+| Δ         | \(\Delta\)      |
+| Θ         | \(\Theta\)      |
+| Λ         | \(\Lambda\)     |
+| Ξ          | \(\Xi\)         |
+| Π         | \(\Pi\)         |
+| Σ          | \(\Sigma\)      |
+| Υ          | \(\Upsilon\)    |
+| Φ         | \(\Phi\)        |
+| Ψ         | \(\Psi\)        |
+| Ω         | \(\Omega\)      |
+| א         | \(\aleph\)      |
+| ב         | \(\beth\)       |
+| ד          | \(\daleth\)     |
+| ג          | \(\gimel\)      |
 
 #+name: gen-latex-non-ascii-char-substitutions
 #+begin_src emacs-lisp :noweb-ref none :var latex-non-ascii-char-substitutions=latex-non-ascii-char-substitutions

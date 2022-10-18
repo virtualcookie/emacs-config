@@ -254,7 +254,7 @@ body {
 
 #page {
   color: var(--text-dark);
-  background-color: var(--back-light);
+  background-color: var(--back-white);
   transition-property: color, background-color;
   transition-duration: 100ms; }
 
@@ -1786,6 +1786,17 @@ span.acr {
     text-decoration: none; }
   .music-track span {
     min-width: 35%; }
+
+.message,
+.MESSAGE {
+  background: rgba(58, 129, 195, 0.15);
+  border: 10px groove yellowgreen;
+  margin: 1.8rem 0 1.25rem 15px;
+  padding: 0.8em;
+  line-height: 1.4;
+  text-align: left;
+  position: relative;
+  clear: both; }
 
 div.table {
   position: relative; }
