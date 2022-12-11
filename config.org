@@ -919,8 +919,12 @@ things during tangle), let's see if we can change that.
 #+call: confpkg-quieter-output()
 
 *** Reporting load time information
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-confpkg-timings
+:END:
 
 #+call: confpkg("Confpkg timings")
+
 
 When generating the config we added a form to collect load-time information.
 
@@ -1314,6 +1318,9 @@ the start of the tangle process. This is done by calling =bootstrap= within the
 [[Preparation][confpkg preparation]] stage.
 
 ** Personal Information
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-personal-information
+:END:
 
 #+call: confpkg()
 
@@ -1335,6 +1342,9 @@ my home machine is pretty safe, and my laptop is shutdown a lot.
 #+end_src
 
 ** Better defaults
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-better-defaults
+:END:
 
 #+call: confpkg()
 
@@ -1444,6 +1454,9 @@ I'd much rather have my new buffers in ~org-mode~ than ~fundamental-mode~, hence
 For some reason this + the mixed pitch hook causes issues with hydra and so I'll
 just need to resort to =SPC b o= for now.
 ** Doom configuration
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-doom
+:END:
 
 #+call: confpkg("Doom")
 
@@ -1803,9 +1816,9 @@ aspects are nice, but on others I prefer Fira.
 #+begin_src emacs-lisp
 (setq doom-font (font-spec :family "JetBrains Mono" :size 24)
       doom-big-font (font-spec :family "JetBrains Mono" :size 36)
-      doom-variable-pitch-font (font-spec :family "Overpass" :size 26)
+      doom-variable-pitch-font (font-spec :family "Overpass" :size 20)
       doom-unicode-font (font-spec :family "JuliaMono")
-      doom-serif-font (font-spec :family "IBM Plex Mono" :size 22 :weight 'light))
+      doom-serif-font (font-spec :family "IBM Plex Mono" :size 16 :weight 'light))
 #+end_src
 
 #+attr_html: :class invertible :alt Screenshot of the fonts within Emacs.
@@ -1820,7 +1833,7 @@ if the system doesn't have any of those fonts.
 
 #+name: detect-missing-fonts
 #+begin_src emacs-lisp :tangle no
-(defvar required-fonts '("JetBrainsMono.*" "Overpass" "JuliaMono" "IBM Plex Mono" "Merriweather" "Alegreya"))
+(defvar required-fonts '("JetBrains Mono.*" "Overpass" "JuliaMono" "IBM Plex Mono" "Merriweather" "Alegreya"))
 
 (defvar available-fonts
   (delete-dups (or (font-family-list)
@@ -2095,10 +2108,16 @@ Let's make creating an Org buffer just that little bit easier.
 #+end_src
 
 *** Dashboard
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-dashboard
+:END:
 
 #+call: confpkg()
 
 **** A fancy splash screen
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref fancy-splash
+:END:
 
 #+call: confpkg("fancy-splash", prefix="")
 
@@ -2522,6 +2541,9 @@ Now we just need this as Doom's ASCII banner function.
 #+end_src
 
 **** Splash phrases
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref splash-phrases
+:END:
 
 #+call: confpkg("splash-phrases", prefix="")
 
@@ -2814,6 +2836,9 @@ frame size or theme is changed.
 
 *** Editor interaction
 **** Mouse buttons
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-better-jumper-mouse
+:END:
 
 #+call: confpkg("Better jumper mouse")
 
@@ -2823,6 +2848,9 @@ frame size or theme is changed.
 #+end_src
 
 *** Window title
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-frame-title
+:END:
 
 #+call: confpkg("Frame title")
 
@@ -2847,6 +2875,9 @@ For example when I open my config file it the window will be titled =config.org 
 doom= then as soon as I make a change it will become =config.org ◉ doom=.
 
 *** Systemd daemon
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-emacs-daemon-setup
+:END:
 
 For running a systemd service for a Emacs server I have the following. =zsh -c= is
 used to ensure that =.zshenv= is loaded.
@@ -3178,6 +3209,9 @@ Specify a ~:branch~ to install a package from a particular branch or tag.
 
 ** Convenience
 *** Avy
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-avy
+:END:
 
 #+call: confpkg("!Pkg avy")
 
@@ -3219,6 +3253,9 @@ sounds nice to me.
 #+end_src
 
 *** Emacs Everywhere
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-emacs-everywhere
+:END:
 
 #+call: confpkg("!Pkg emacs-everywhere")
 
@@ -3254,6 +3291,9 @@ Doom module.
 #+end_src
 
 *** Which-key
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-which-key
+:END:
 
 #+call: confpkg("!Pkg which-key")
 
@@ -3283,6 +3323,9 @@ let's change that, and do a few other similar tweaks while we're at it.
 
 ** Tools
 *** Abbrev
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-multi-mode-abbrev
+:END:
 
 #+call: confpkg("Multi-mode abbrev")
 
@@ -3297,6 +3340,9 @@ have the following.
 #+end_src
 
 *** Very large files
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-vlf
+:END:
 
 #+call: confpkg("!Pkg VLF")
 
@@ -3416,6 +3462,9 @@ Unfortunately, since evil-search doesn't have an analogue to
 ~isearch-wrap-function~, we can't easily add support to it.
 
 *** Eros
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-eros
+:END:
 
 #+call: confpkg("!Pkg Eros")
 
@@ -3430,6 +3479,9 @@ could be slightly nicer though.
 #+end_src
 
 *** EVIL
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-evil
+:END:
 
 #+call: confpkg("!Pkg evil")
 
@@ -3462,6 +3514,9 @@ the mode on startup, let's prevent installation of the package.
 #+end_src
 
 *** Consult
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-consult
+:END:
 
 #+call: confpkg("!Pkg Consult")
 
@@ -3481,6 +3536,9 @@ Unfortunately this seems to mess things up, which is something I'll want to look
 into later.
 
 *** Magit
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-magit
+:END:
 
 #+call: confpkg("!Pkg Magit")
 
@@ -3674,6 +3732,9 @@ Unfortunately this currently seems to mess things up, which is something I'll
 want to look into later.
 
 *** Smerge
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-smerge
+:END:
 
 #+call: confpkg("!Pkg Smerge")
 
@@ -3709,6 +3770,9 @@ For repeated operations, a hydra would be helpful. But I prefer transient.
 #+end_src
 
 *** Company
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-company
+:END:
 
 #+call: confpkg("!Pkg Company")
 
@@ -3758,6 +3822,9 @@ We then configure the dictionary we're using in [[*Ispell][Ispell]].
 #+end_src
 
 *** Projectile
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-projectile
+:END:
 
 #+call: confpkg("!Pkg Projectile")
 
@@ -3810,6 +3877,9 @@ cd aspell6-en-custom
 *** Auto activating snippets
 
 **** Configuration
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-ispell
+:END:
 
 #+call: confpkg("!Pkg Ispell")
 
@@ -3838,6 +3908,9 @@ This makes it a breeze to take lovely screenshots.
 #+end_src
 
 *** TRAMP
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-tramp
+:END:
 
 #+call: confpkg("TRAMP")
 
@@ -3887,6 +3960,9 @@ That's no problem though, we just need to help TRAMP find them.
 #+end_src
 
 *** Auto activating snippets
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-aas
+:END:
 
 #+call: confpkg("!Pkg AAS")
 
@@ -3902,6 +3978,9 @@ Sometimes pressing =TAB= is just too much.
 #+end_src
 
 *** Screenshot
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-screenshot
+:END:
 
 #+call: confpkg("!Pkg Screenshot")
 
@@ -3924,6 +4003,9 @@ file uploading script (which I've renamed to ~upload~).
 #+end_src
 
 *** Etrace
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-etrace
+:END:
 
 #+call: confpkg("!Pkg etrace")
 
@@ -3944,6 +4026,9 @@ investigation.
 #+end_src
 
 *** YASnippet
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-yasnippet
+:END:
 
 #+call: confpkg("!Pkg YASnippet")
 
@@ -3957,6 +4042,9 @@ Nested snippets are good, so let's enable that.
 #+end_src
 
 *** String inflection
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-string-inflection
+:END:
 
 #+call: confpkg("!Pkg String Inflection")
 
@@ -3996,6 +4084,9 @@ For when you want to change the case pattern for a symbol.
 #+end_src
 
 *** Smart parentheses
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-smartparens
+:END:
 
 #+call: confpkg("!Pkg SmartParens")
 
@@ -4063,16 +4154,17 @@ This package adds Org tables, Org quotes and Org source block results to this li
 (package! ob-dsq)
 #+end_src
 
-#+begin_src emacs-lisp :tangle packages.el
+#+begin_src emacs-lisp
 (use-package! ob-dsq)
 #+end_src
+
 *** Denote
 https://protesilaos.com/emacs/denote
 #+begin_src emacs-lisp :tangle packages.el
 (package! denote)
 #+end_src
 
-#+begin_src emacs-lisp :tangle packages.el
+#+begin_src emacs-lisp
 (use-package! denote
   :after org
   :config
@@ -4086,7 +4178,9 @@ Notes migrator
 https://github.com/bitspook/notes-migrator
 #+begin_src emacs-lisp :tangle packages.el
 (package! notes-migrator :recipe (:host github :repo "bitspook/notes-migrator"))
+#+end_src
 
+#+begin_src emacs-lisp 
 (use-package! notes-migrator
   :after denote)
 #+end_src
@@ -4104,7 +4198,9 @@ An Org-mode query language, including search commands and saved views
 (package! org-ql
   :recipe (:host github :repo "alphapapa/org-ql"          
            :files (:defaults (:exclude "helm-org-ql.el"))))
+#+end_src
 
+#+begin_src emacs-lisp
 (use-package! org-ql
   :after org)
 #+end_src
@@ -4117,11 +4213,14 @@ https://github.com/chrisbarrett/nursery
 (package! org-roam-nursery
   :recipe (:host github :repo "chrisbarrett/nursery"
            :files ("lisp/*.el")))
+#+end_src
+
+#+begin_src emacs-lisp
 (use-package! org-roam-nursery
   :after org-roam)
 #+end_src
 
-#+begin_src emacs-lisp :tangle packages.el
+#+begin_src emacs-lisp
 (use-package org-roam-review
   :commands (org-roam-review
              org-roam-review-list-by-maturity
@@ -4173,6 +4272,9 @@ https://github.com/chrisbarrett/nursery
 
 ** Visuals
 *** Info colours
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-info-colors
+:END:
 
 #+call: confpkg("!Pkg Info colors")
 
@@ -4220,6 +4322,9 @@ so I'd like to make sure we have a recent version.
 #+end_src
 
 *** Theme magic
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-theme-magic
+:END:
 
 #+call: confpkg("!Pkg Theme magic")
 
@@ -4267,6 +4372,9 @@ lightened versions --- let's do that.
 #+end_src
 
 *** Simple comment markup
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-simple-comment-markup
+:END:
 
 #+call: confpkg("!Pkg simple-comment-markup")
 
@@ -4291,6 +4399,9 @@ situations decently.
 #+end_src
 
 *** Emojify
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-emojify
+:END:
 
 #+call: confpkg("!Pkg emojify")
 
@@ -4357,6 +4468,9 @@ Email and IRC.
 #+end_src
 
 *** Doom modeline
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-doom-modeline
+:END:
 
 #+call: confpkg("!Pkg Doom modeline", after="doom-modeline")
 
@@ -4560,6 +4674,9 @@ icon. Then we'll redefine two functions used to generate the modeline.
 #+end_src
 
 *** Keycast
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-keycast
+:END:
 
 #+call: confpkg("!Pkg Keycast")
 
@@ -4597,6 +4714,9 @@ Let's just make sure this is lazy-loaded appropriately.
 #+end_src
 
 *** Screencast
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-screencast
+:END:
 
 #+call: confpkg("!Pkg Screencast")
 
@@ -4642,6 +4762,9 @@ theme.
 #+end_src
 
 *** Mixed pitch
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-mixed-pitch
+:END:
 
 #+call: confpkg("!Pkg mixed pitch")
 
@@ -4708,6 +4831,9 @@ Part of the =:completion vertico= module.
 #+end_quote
 
 **** Variable pitch serif font
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-variable-pitch-serif-font
+:END:
 
 #+call: confpkg()
 
@@ -4733,6 +4859,9 @@ For ease of use, let's also set up an easy way of setting the ~:font~ attribute.
 #+end_src
 
 *** Marginalia
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-marginalia
+:END:
 
 #+call: confpkg("!Pkg Marginalia")
 
@@ -4791,6 +4920,9 @@ shadow)=, but I don't like that.
 #+end_src
 
 *** Centaur Tabs
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-centaur-tabs
+:END:
 
 #+call: confpkg("!Pkg Centaur Tabs")
 
@@ -4831,6 +4963,9 @@ well somehow, so let's switch to 'P22 Underground Book'; it looks much nicer.
 #+end_src
 
 *** All the icons
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-all-the-icons
+:END:
 
 #+call: confpkg("!Pkg All the Icons")
 
@@ -4843,6 +4978,9 @@ From the =:core packages= module.
 (run-with-idle-timer 0.1 nil (lambda () (add-hook 'doom-load-theme-hook 'theme-magic-from-emacs)))
 #+end_src
 *** Prettier page breaks
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-page-break-lines
+:END:
 
 #+call: confpkg("!Pkg page break lines")
 
@@ -4867,6 +5005,9 @@ these as horizontal rules.
 #+end_src
 
 *** Writeroom
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-writeroom
+:END:
 
 #+call: confpkg("Writeroom")
 
@@ -4942,6 +5083,9 @@ tweaks. Namely:
 [[https://tecosaur.com/lfs/emacs-config/screenshots/writeroom-and-org.png]]
 
 *** Treemacs
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-treemacs
+:END:
 
 #+call: confpkg("!Pkg treemacs")
 
@@ -4986,6 +5130,9 @@ good reason for them to take up space. Let's add a mechanism to ignore them.
 
 ** Frivolities
 *** xkcd
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-xkcd
+:END:
 
 #+call: confpkg("XKCD")
 
@@ -5279,6 +5426,9 @@ SQL can be either the emacsql vector representation, or a string."
 #+end_src
 
 *** Selectric
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-selectric
+:END:
 
 #+call: confpkg("!Pkg Selectric")
 
@@ -5294,6 +5444,9 @@ amuse oneself. Introducing: typewriter sounds!
 #+end_src
 
 *** Wttrin
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-wttrin
+:END:
 
 #+call: confpkg("!Pkg Wttrin")
 
@@ -5310,6 +5463,9 @@ roll our [[file:lisp/wttrin/wttrin.el][own version]].
 #+end_src
 
 *** Spray
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-spray
+:END:
 
 #+call: confpkg("!Pkg Spray")
 
@@ -5348,6 +5504,9 @@ we're at it.
 #+end_src
 
 *** Elcord
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-elcord
+:END:
 
 #+call: confpkg("!Pkg Elcord")
 
@@ -5366,6 +5525,9 @@ about it?
 
 ** File types
 *** Systemd
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-systemd
+:END:
 
 #+call: confpkg("!Pkg Systemd")
 
@@ -5381,6 +5543,9 @@ For editing systemd unit files
 
 * Applications
 ** Ebooks
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-ebooks
+:END:
 
 #+call: confpkg()
 
@@ -5549,6 +5714,9 @@ Then, to actually read the ebooks we use =nov=.
 #+end_src
 
 ** Calculator
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-calculator
+:END:
 
 #+call: confpkg()
 
@@ -5681,6 +5849,9 @@ panel.
 #+end_src
 
 ** IRC
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-irc
+:END:
 
 #+call: confpkg()
 
@@ -5976,6 +6147,9 @@ Now, some actual emojis to use.
 #+end_src
 
 ** Newsfeed
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-newsfeed
+:END:
 
 #+call: confpkg()
 
@@ -6283,6 +6457,9 @@ fi
 #+end_src
 
 ** Mail
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-mail
+:END:
 
 #+call: confpkg(after="mu4e", via="require", pre="org-msg-accent")
 
@@ -7550,6 +7727,9 @@ Get the GCP client ID & the secret from environment variables
 * Language configuration
 ** General
 *** File Templates
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-file-templates
+:END:
 
 #+call: confpkg()
 
@@ -7563,6 +7743,9 @@ need to have a template assigned.
 #+end_src
 
 ** Plaintext
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-plaintext
+:END:
 
 #+call: confpkg()
 
@@ -7807,6 +7990,9 @@ correct package statement needed.
 
 **** Visuals
 ***** Org Modern
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-org-modern
+:END:
 
 #+call: confpkg("!Pkg org-modern")
 
@@ -7902,6 +8088,9 @@ spell-check face ignore list
 #+end_src
 
 ***** Emphasis markers
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-org-appear
+:END:
 
 #+call: confpkg("!Pkg org-appear")
 
@@ -7926,6 +8115,9 @@ sacrificing visual amenities with the =org-appear= package.
 #+end_src
 
 ***** Heading structure
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-org-ol-tree
+:END:
 
 #+call: confpkg("!Pkg org-ol-tree")
 
@@ -7958,6 +8150,9 @@ recognising the pgtk window system]].
 
 **** Extra functionality
 ***** Julia support
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-ob-julia
+:END:
 
 #+call: confpkg("!Pkg ob-julia")
 
@@ -7981,6 +8176,9 @@ recognising the pgtk window system]].
 #+end_src
 
 ***** HTTP requests
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-ob-http
+:END:
 
 #+call: confpkg("!Pkg ob-http")
 
@@ -7995,6 +8193,9 @@ I like the idea of being able to make HTTP requests with Babel.
 #+end_src
 
 ***** Transclusion
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-org-transclusion
+:END:
 
 #+call: confpkg("!Pkg org-transclusion")
 
@@ -8013,6 +8214,9 @@ There's a really cool package in development to /transclude/ Org document conten
 #+end_src
 
 ***** Heading graph
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-org-graph-view
+:END:
 
 #+call: confpkg("!Pkg org-graph-view")
 
@@ -8022,6 +8226,9 @@ Came across this and ... it's cool
 #+end_src
 
 ***** Cooking recipes
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-org-chef
+:END:
 
 #+call: confpkg("!Pkg org-chef")
 
@@ -8039,6 +8246,9 @@ it, either by command or in a capture template.
 #+end_src
 
 ***** Importing with Pandoc
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-org-pandoc-import
+:END:
 
 #+call: confpkg("!Pkg org-pandoc-import")
 
@@ -8078,6 +8288,9 @@ to make that right again, and this package makes that even easier to do.
 #+end_src
 
 ***** Glossaries and more
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-org-glossary
+:END:
 
 #+call: confpkg("!Pkg org-glossary")
 
@@ -8110,6 +8323,9 @@ improve the LaTeX usage references with =cleveref='s ~\labelcpageref~ command.
 #+end_src
 
 ***** Document comparison
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-orgdiff
+:END:
 
 #+call: confpkg("!Pkg orgdiff")
 
@@ -8147,6 +8363,9 @@ post-processing the =latexdiff= result.
 #+end_src
 
 ***** Org music
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-org-music
+:END:
 
 #+call: confpkg("!Pkg org-music")
 
@@ -8165,6 +8384,9 @@ It's nice to be able to link to music
 #+end_src
 
 *** Behaviour
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-org-behaviour
+:END:
 
 #+call: confpkg("Org Behaviour", after="org")
 
@@ -8276,6 +8498,9 @@ Now we'll just add that under the Org mode link localleader for convenience.
 #+end_src
 
 ***** Citation
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-org-citation
+:END:
 
 #+call: confpkg("Org Citation")
 
@@ -8420,7 +8645,7 @@ Now, by default, LSPs don't really function at all in ~src~ blocks.
                 (format "Prepare local buffer environment for org source block (%s)."
                         (upcase ,lang))))))))
 (defvar org-babel-lang-list
-  '("go" "python" "ipython" "bash" "sh"))
+  '("go" "python" "ipython" "bash" "sh" "swift"))
 (dolist (lang org-babel-lang-list)
   (eval `(lsp-org-babel-enable ,lang)))
 #+end_src
@@ -8460,6 +8685,9 @@ functionality as in LaTeX. Let's try viewing possible output files with this.
 #+end_src
 
 **** Super agenda
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-org-super-agenda
+:END:
 
 #+call: confpkg("!Pkg Org Super Agenda")
 
@@ -8855,6 +9083,9 @@ no modeline.
 #+end_src
 
 **** Roam
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-org-roam
+:END:
 
 #+call: confpkg("!Pkg org-roam", after="org-roam")
 
@@ -8894,6 +9125,9 @@ the [[*Window title][Window title]].
 #+end_src
 
 ***** Graph view
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-org-roam-ui
+:END:
 
 #+call: confpkg("!Pkg org-roam-ui")
 
@@ -9604,6 +9838,9 @@ cause issues. Let's make their failure less eventful.
 #+end_src
 
 **** Flycheck with org-lint
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-flycheck-org-lint
+:END:
 
 #+call: confpkg("Flycheck org-lint", after="org")
 
@@ -9706,6 +9943,9 @@ much.
 #+end_src
 
 *** Visuals
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-org-visuals
+:END:
 
 #+call: confpkg("Org Visuals", after="org")
 
@@ -10134,7 +10374,7 @@ theme-appropriate foreground.
 We can either render from a ~dvi~ or ~pdf~ file, so let's benchmark ~latex~ and
 ~pdflatex~.
 | ~latex~ time | ~pdflatex~ time |
-|--------------+-----------------|
+|------------+---------------|
 | 135 \pm 2 ms | 215 \pm 3 ms    |
 
 On the rendering side, there are two ~.dvi~-to-image converters which I am
@@ -10142,7 +10382,7 @@ interested in: ~dvipng~ and ~dvisvgm~.
 
 Using the above latex expression and benchmarking lead to the following results:
 | ~dvipng~ time | ~dvisvgm~ time | ~pdf2svg~ time |
-|---------------+----------------+----------------|
+|-------------+--------------+--------------|
 | 89 \pm 2 ms   | 178 \pm 2 ms   | 12 \pm 2 ms    |
 
 Now let's combine this to see what's best
@@ -10245,6 +10485,9 @@ set palette defined ( 0 '%s',\
 #+end_src
 
 *** Exporting
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-org-exports
+:END:
 
 #+call: confpkg("Org exports", after="ox")
 
@@ -10368,6 +10611,9 @@ can tweak ~+org-babel-mode-alist~ when exporting.
 #+end_src
 
 *** HTML Export
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-ox-html
+:END:
 
 #+call: confpkg("ox-html", after="ox-html")
 
@@ -11116,6 +11362,9 @@ MathJax = {
 #+end_src
 
 *** LaTeX Export
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-ox-latex
+:END:
 
 #+call: confpkg("ox-latex", after="ox-latex")
 
@@ -12763,51 +13012,51 @@ Now, there are some symbols that aren't included in =inputenc=, but we should be
 able to handle anyway. For them we define a table of LaTeX translations
 
 #+name: latex-non-ascii-char-substitutions
-| Character | LaTeX           |
-|-----------+-----------------|
-| ɑ         | \(\alpha\)      |
-| β          | \(\beta\)       |
-| γ          | \(\gamma\)      |
-| δ          | \(\delta\)      |
-| ε          | \(\epsilon\)    |
-| ϵ          | \(\varepsilon\) |
-| ζ          | \(\zeta\)       |
-| η          | \(\eta\)        |
-| θ         | \(\theta\)      |
-| ϑ          | \(\vartheta\)   |
-| ι          | \(\iota\)       |
-| κ          | \(\kappa\)      |
-| λ          | \(\lambda\)     |
-| μ          | \(\mu\)         |
-| ν          | \(\nu\)         |
-| ξ          | \(\xi\)         |
-| π         | \(\pi\)         |
-| ϖ         | \(\varpi\)      |
-| ρ          | \(\rho\)        |
-| ϱ          | \(\varrho\)     |
-| σ          | \(\sigma\)      |
-| ς          | \(\varsigma\)   |
-| τ          | \(\tau\)        |
-| υ          | \(\upsilon\)    |
-| ϕ         | \(\phi\)        |
-| φ         | \(\varphi\)     |
-| ψ         | \(\psi\)        |
-| ω         | \(\omega\)      |
-| Γ          | \(\Gamma\)      |
-| Δ         | \(\Delta\)      |
-| Θ         | \(\Theta\)      |
-| Λ         | \(\Lambda\)     |
-| Ξ          | \(\Xi\)         |
-| Π         | \(\Pi\)         |
-| Σ          | \(\Sigma\)      |
-| Υ          | \(\Upsilon\)    |
-| Φ         | \(\Phi\)        |
-| Ψ         | \(\Psi\)        |
-| Ω         | \(\Omega\)      |
-| א         | \(\aleph\)      |
-| ב         | \(\beth\)       |
-| ד          | \(\daleth\)     |
-| ג          | \(\gimel\)      |
+| Character | LaTeX |
+|-----------+-------|
+| ɑ         | \(\alpha\)  |
+| β          | \(\beta\)  |
+| γ          | \(\gamma\)  |
+| δ          | \(\delta\)  |
+| ε          | \(\epsilon\)  |
+| ϵ          | \(\varepsilon\)  |
+| ζ          | \(\zeta\)  |
+| η          | \(\eta\)  |
+| θ          | \(\theta\)  |
+| ϑ          | \(\vartheta\)  |
+| ι          | \(\iota\)  |
+| κ          | \(\kappa\)  |
+| λ          | \(\lambda\)  |
+| μ          | \(\mu\)  |
+| ν          | \(\nu\)  |
+| ξ          | \(\xi\)  |
+| π          | \(\pi\)  |
+| ϖ         | \(\varpi\) |
+| ρ          | \(\rho\)  |
+| ϱ          | \(\varrho\)  |
+| σ          | \(\sigma\)  |
+| ς          | \(\varsigma\)  |
+| τ          | \(\tau\)  |
+| υ          | \(\upsilon\)  |
+| ϕ         | \(\phi\) |
+| φ         | \(\varphi\) |
+| ψ         | \(\psi\) |
+| ω         | \(\omega\) |
+| Γ          | \(\Gamma\)  |
+| Δ          | \(\Delta\)  |
+| Θ         | \(\Theta\) |
+| Λ          | \(\Lambda\)  |
+| Ξ          | \(\Xi\)  |
+| Π         | \(\Pi\) |
+| Σ          | \(\Sigma\)  |
+| Υ          | \(\Upsilon\)  |
+| Φ         | \(\Phi\) |
+| Ψ         | \(\Psi\) |
+| Ω         | \(\Omega\) |
+| א          | \(\aleph\) |
+| ב          | \(\beth\)  |
+| ד          | \(\daleth\)  |
+| ג          | \(\gimel\)  |
 
 #+name: gen-latex-non-ascii-char-substitutions
 #+begin_src emacs-lisp :noweb-ref none :var latex-non-ascii-char-substitutions=latex-non-ascii-char-substitutions
@@ -12894,6 +13143,9 @@ I'd quite like to also recognise =->= and =<-=, so let's set come up with some a
 #+end_src
 
 **** Chameleon --- aka. match theme
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-ox-chameleon
+:END:
 
 #+call: confpkg("!Pkg ox-chameleon")
 
@@ -13045,6 +13297,9 @@ export to a PDF.
 #+end_src
 
 *** Beamer Export
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-ox-beamer
+:END:
 
 #+call: confpkg("ox-beamer", after="ox-beamer")
 
@@ -13106,6 +13361,9 @@ frame from ~1~ to ~2~.
 #+end_src
 
 *** Reveal export
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-org-re-reveal
+:END:
 
 #+call: confpkg("!Pkg org-re-reveal", after="org-re-reveal")
 
@@ -13119,6 +13377,9 @@ good idea.
 #+end_src
 
 *** ASCII export
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-ox-ascii
+:END:
 
 #+call: confpkg("ox-ascii", after="ox-ascii")
 
@@ -13179,10 +13440,16 @@ information."
 #+end_src
 
 *** Markdown Export
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-ox-md
+:END:
 
 #+call: confpkg("ox-md", after="ox-md")
 
 **** GFM
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-ox-gfm
+:END:
 
 #+call: confpkg("!Pkg ox-gfm")
 
@@ -13276,6 +13543,9 @@ contextual information."
 #+end_src
 
 *** Babel
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-org-babel
+:END:
 
 #+call: confpkg("Org Babel")
 
@@ -13327,6 +13597,9 @@ Not added when either:
 #+end_src
 
 *** ESS
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-org-ess
+:END:
 
 #+call: confpkg("Org ESS")
 
@@ -13360,6 +13633,9 @@ the language identifier, not =ess-jags=.
 #+end_src
 
 ** LaTeX
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-latex
+:END:
 
 #+call: confpkg()
 
@@ -13720,6 +13996,9 @@ but more convenient, like =;=.
 #+end_src
 
 **** LAAS
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-laas
+:END:
 
 #+call: confpkg("!Pkg LAAS")
 
@@ -13786,6 +14065,9 @@ priority of =mypyls=
 #+end_src
 
 *** Terminal viewing
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-pdftotext
+:END:
 
 #+call: confpkg("!Pkg pdftotext", needs="pdftotext")
 
@@ -13824,6 +14106,9 @@ Lastly, whenever Emacs is non-graphical (i.e. a TUI), we want to use this by def
 #+end_src
 
 ** R
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-r-lang
+:END:
 
 #+call: confpkg("R lang")
 
@@ -13856,6 +14141,9 @@ Lastly, whenever Emacs is non-graphical (i.e. a TUI), we want to use this by def
 #+end_src
 
 ** Julia
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-julia
+:END:
 
 #+call: confpkg(after="julia-mode")
 
@@ -13885,6 +14173,9 @@ update-mime-database ~/.local/share/mime
 #+end_src
 
 ** Graphviz
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-graphviz-dot-mode
+:END:
 
 #+call: confpkg("!Pkg graphviz-dot-mode")
 
@@ -13908,6 +14199,9 @@ Graphviz is a nice method of visualising simple graphs, based on plaintext
 #+end_src
 
 ** Markdown
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config-markdown
+:END:
 
 #+call: confpkg()
 
@@ -13935,6 +14229,9 @@ sixth greyed out. Since the sixth level is so small, I'll turn up the boldness a
 #+end_src
 
 ** Beancount
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-beancount
+:END:
 
 #+call: confpkg("!Pkg Beancount")
 
