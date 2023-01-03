@@ -6,7 +6,7 @@
 #+email: contact@tecosaur.net
 #+date: @@html:<!--@@{{{git-rev}}}@@html:-->@@@@latex:\\\Large\bfseries@@ {{{modification-time(%Y-%m-%d, t)}}} @@latex:\\\normalsize\mdseries@@{{{modification-time(%H:%M, t)}}} @@latex:\acr{\lowercase{@@{{{timezone}}}@@latex:}}\iffalse@@, {{{git-rev}}}@@latex:\fi@@
 #+macro: timezone (eval (substring (shell-command-to-string "date +%Z") 0 -1))
-#+macro: git-rev (eval (format "@@html:<a href=\"https://github.com/tecosaur/emacs-config/commit/%1$s\" style=\"text-decoration: none\"><code style=\"padding: 0; color: var(--text-light); font-size: inherit; opacity: 0.7\">%1$s</code></a>@@@@latex:\\href{https://github.com/tecosaur/emacs-config/commit/%1$s}{\\normalsize\\texttt{%1$s}}@@" (substring (shell-command-to-string "git rev-parse --short HEAD") 0 -1)))
+#+macro: git-rev (eval (format "@@html:<a href=\"https://git.tecosaur.net/tec/emacs-config/commit/%1$s\" style=\"text-decoration: none\"><code style=\"padding: 0; color: var(--text-light); font-size: inherit; opacity: 0.7\">%1$s</code></a>@@@@latex:\\href{https://git.tecosaur.net/tec/emacs-config/commit/%1$s}{\\normalsize\\texttt{%1$s}}@@" (substring (shell-command-to-string "git rev-parse --short HEAD") 0 -1)))
 #+html_head: <link rel='shortcut icon' type='image/png' href='https://www.gnu.org/software/emacs/favicon.png'>
 #+property: header-args:emacs-lisp
 #+property: header-args:elisp :results replace :exports code
@@ -19,7 +19,8 @@
 #+latex_class: book
 #+latex_header: \usepackage[autooneside=false,automark,headsepline]{scrlayer-scrpage}
 #+latex_header: \clearpairofpagestyles \renewcommand*{\chaptermarkformat}{} \renewcommand*{\sectionmarkformat}{}
-#+latex_header: \ihead{\upshape\scshape\leftmark} \chead{\ifstr{\leftmark}{\rightmark}{}{\rightmark}} \ohead[\pagemark]{\pagemark}
+#+latex_header: \ihead{\upshape\scshape\leftmark} \chead{\Ifstr{\leftmark}{\rightmark}{}{\rightmark}} \ohead[\pagemark]{\pagemark}
+#+latex_engraved_theme: doom-one-light
 
 #+begin_export html
 <a href="https://git.tecosaur.net/tec/emacs-config/"
@@ -28,7 +29,7 @@
   <img src="https://git-scm.com/images/logos/downloads/Git-Icon-Black.svg"
        class="invertible" alt="Git"
        style="height: 1em; position: relative; top: 0.1em;">
-  Visit repository</a>&ensp;
+  Repository</a>&ensp;
 <a href="https://liberapay.com/tec"
    style="position: relative;top: clamp(-22px, calc(1280px - 100vw), 0px);">
   <img src="https://shields.io/badge/support%20my%20efforts-f6c915?logo=Liberapay&style=flat&logoColor=black"
@@ -268,6 +269,39 @@ external setup (i.e. outside of this config).
   If this causes issues, just delete the src_elisp{(setq ispell-dictionary ...)}
   bit.
 
+There are also a number of files I may tangle to /other than/
+={init,config,package}.el=. The complete list (excluding confpkg generated files)
+is as follows:
+
+#+begin_src emacs-lisp :results value list replace :exports results :eval yes
+(mapcar
+ (lambda (path)
+   (format "=%s="
+           (replace-regexp-in-string
+            (regexp-quote (getenv "HOME")) "~"
+            (expand-file-name path default-directory))))
+ (sort
+  (cl-remove-if
+   (lambda (path)
+     (or (member path '("yes" "no"))
+         (string-match-p "^/tmp" path)))
+   (cl-delete-duplicates
+    (org-element-map (org-element-parse-buffer)
+        'src-block
+      (lambda (src)
+        (let ((dest (alist-get :tangle
+                               (org-babel-parse-header-arguments
+                                (org-element-property :parameters src) t))))
+          (if (and (stringp dest) (string-match-p "^(if" dest))
+              (car (cl-set-difference
+                    (mapcar #'eval (seq-drop (read dest) 2))
+                    '("yes" "no")
+                    :test #'equal))
+            dest))))
+    :test #'equal))
+  #'string<))
+#+end_src
+
 Oh, did I mention that I started this config when I didn't know any =elisp=, and
 this whole thing is a hack job? If you can suggest any improvements, please do
 so, no matter how much criticism you include I'll appreciate it :)
@@ -422,7 +456,7 @@ calls in the buffer.
 See the [[Bootstrap]] section for an explanation of the =<<bootstrap>>= noweb reference.
 
 #+header: :tangle (expand-file-name (make-temp-name "emacs-org-babel-excuses/confpkg-prepare-") temporary-file-directory)
-#+begin_src emacs-lisp :noweb no-export :mkdirp yes
+#+begin_src emacs-lisp :noweb no-export :mkdirp yes :export-embed no
 <<confpkg-prepare()>>
 #+end_src
 
@@ -490,12 +524,15 @@ modify the parent heading, and register the config group with the variables we
 created earlier.
 
 #+name: confpkg
-#+begin_src elisp :var name="" needs="" after="" prefix="config-" via="copy" :results silent raw :noweb no-export
+#+begin_src elisp :var name="" needs="" after="" pre="" prefix="config-" via="copy" :results silent raw :noweb no-export
 ;; Babel block for use with #+call
 ;; Arguments:
 ;;  - name, the name of the config sub-package
 ;;  - needs, (when non-empty) required system executable(s)
 ;;  - after, required features
+;;  - pre, a noweb reference to code that should be executed eagerly,
+;;    and not deferred via after. The code is not included in the
+;;    generated .el file and should only be used in dire situations.
 ;;  - prefix, the package prefix ("config-" by default)
 ;;  - via, how this configuration should be included in config.el,
 ;;    the current options are:
@@ -519,6 +556,7 @@ created earlier.
            ((string-match-p "\\`[^()]+\\'" after)
             (intern after)) ; Single feature.
            (t after)))
+         (pre (and (not (string-empty-p pre)) pre))
          (confpkg-name
           (concat prefix (replace-regexp-in-string
                           "[^a-z-]" "-" (downcase name))))
@@ -534,6 +572,7 @@ created earlier.
                 :package confpkg-name
                 :file confpkg-file
                 :after after
+                :pre pre
                 :via (intern via))
           confpkg--list)
     (format-spec
@@ -746,7 +785,8 @@ tempbuffer. We can call this with the finalising step.
 #+begin_src emacs-lisp
 (defun confpkg-create-config ()
   (let ((revert-without-query '("config\\.el"))
-        (keywords (org-collect-keywords '("AUTHOR" "EMAIL"))))
+        (keywords (org-collect-keywords '("AUTHOR" "EMAIL")))
+        (original-buffer (current-buffer)))
     (with-temp-buffer
       (insert
        (format ";;; config.el -*- lexical-binding: t; -*-
@@ -816,16 +856,30 @@ tempbuffer. We can call this with the finalising step.
 (confpkg-create-record 'load-hooks 0.0 'config-defered)
 (confpkg-create-record 'requires 0.0 'root)\n"))
                 (let ((after (plist-get confpkg :after))
+                      (pre (and (plist-get confpkg :pre)
+                                (org-babel-expand-noweb-references
+                                 (list "emacs-lisp"
+                                       (format "<<%s>>" (plist-get confpkg :pre))
+                                       '((:noweb . "yes")
+                                         (:comments . "none")))
+                                 original-buffer)))
                       (name (replace-regexp-in-string
                              "config--?" ""
                              (plist-get confpkg :package))))
-                  (when after
-                    (insert (format "(confpkg-with-record '%S\n"
-                                    (list (concat "hook: " name) 'set-hooks))
-                            (format (if (symbolp after) ; If single feature.
-                                        "  (with-eval-after-load '%s\n"
-                                      "  (after! %s\n")
-                                    after)))
+                  (if after
+                      (insert (format "(confpkg-with-record '%S\n"
+                                      (list (concat "hook: " name) 'set-hooks))
+                              (if pre
+                                  (concat ";; Begin pre\n" pre "\n;; End pre\n")
+                                "")
+                              (format (if (symbolp after) ; If single feature.
+                                          "  (with-eval-after-load '%s\n"
+                                        "  (after! %s\n")
+                                      after))
+                    (when pre
+                      (insert "\n;; Begin pre (unnecesary since after is unused)\n"
+                              pre
+                              "\n;; End pre\n")))
                   (insert
                    (format "(confpkg-with-record '%S\n"
                            (list (concat "load: " name)
@@ -1165,7 +1219,8 @@ To start with, we'll check if we are:
       (print! (start "Initiating bootstrap..."))
       <<bootstrap-perform>>
       )
-     (t (message "Installed Org version %s is too old, %s is needed.\nRun \"doom sync\" to fix.")))))
+     (t (message "Installed Org version %s is too old, %s is needed.\nRun \"doom sync\" to fix."
+                 (org-version) required-org-version)))))
 #+end_src
 
 If these conditions are met, we can assume that the loaded Org version is
@@ -2114,23 +2169,160 @@ replacement system.
 
 #+begin_src emacs-lisp
 (defvar fancy-splash-template-colours
-  '(("#000001" :face ansi-color-black)
-    ("#111112" :face font-lock-keyword-face)
-    ("#222223" :face font-lock-type-face)
-    ("#333334" :face font-lock-constant-face)
-    ("#444445" :face font-lock-function-name-face)
-    ("#555556" :face font-lock-string-face)
-    ("#666667" :face error)
+  '(("#111112" :face default   :attr :foreground)
+    ("#8b8c8d" :face shadow)
+    ("#eeeeef" :face default   :attr :background)
+    ("#e66100" :face highlight :attr :background)
+    ("#1c71d8" :face font-lock-keyword-face)
+    ("#f5c211" :face font-lock-type-face)
+    ("#813d9c" :face font-lock-constant-face)
+    ("#865e3c" :face font-lock-function-name-face)
+    ("#2ec27e" :face font-lock-string-face)
+    ("#c01c28" :face error)
+    ("#000001" :face ansi-color-black)
     ("#ff0000" :face ansi-color-red)
+    ("#ff00ff" :face ansi-color-magenta)
     ("#00ff00" :face ansi-color-green)
+    ("#ffff00" :face ansi-color-yellow)
     ("#0000ff" :face ansi-color-blue)
-    ("$ddddde" :face shadow)
-    ("#eeeeef" :face ansi-color-bright-white)
-    ("#fffff1" :face ansi-color-white))
+    ("#00ffff" :face ansi-color-cyan)
+    ("#fffffe" :face ansi-color-white))
   "Alist of colour-replacement plists.
 Each plist is of the form (\"$placeholder\" :doom-color 'key :face 'face).
 If the current theme is a doom theme :doom-color will be used,
 otherwise the colour will be face foreground.")
+#+end_src
+
+If we want to make sure an image is themed, we can look for unrecognised hex
+strings that are not greyscale (as greyscale can be expected in the form of a
+transparent overlay).
+
+#+begin_src emacs-lisp
+(defun fancy-splash-check-buffer ()
+  "Check the current SVG buffer for bad colours."
+  (interactive)
+  (when (eq major-mode 'image-mode)
+    (xml-mode))
+  (when (and (featurep 'rainbow-mode)
+             (not (bound-and-true-p rainbow-mode)))
+    (rainbow-mode 1))
+  (let* ((colours (mapcar #'car fancy-splash-template-colours))
+         (colourise-hex
+          (lambda (hex)
+            (propertize
+             hex
+             'face `((:foreground
+                      ,(if (< 0.5
+                              (cl-destructuring-bind (r g b) (x-color-values hex)
+                                ;; Values taken from `rainbow-color-luminance'
+                                (/ (+ (* .2126 r) (* .7152 g) (* .0722 b))
+                                   (* 256 255 1.0))))
+                           "white" "black")
+                      (:background ,hex))))))
+         (cn 96)
+         (colour-menu-entries
+          (mapcar
+           (lambda (colour)
+             (cl-incf cn)
+             (cons cn
+                   (cons
+                    (substring-no-properties colour)
+                    (format " (%s) %s %s"
+                            (propertize (char-to-string cn)
+                                        'face 'font-lock-keyword-face)
+                            (funcall colourise-hex colour)
+                            (propertize
+                             (symbol-name
+                              (plist-get
+                               (cdr (assoc colour fancy-splash-template-colours))
+                               :face))
+                             'face 'shadow)))))
+           colours))
+         (colour-menu-template
+          (format
+           "Colour %%s is unexpected! Should this be one of the following?\n
+%s
+ %s to ignore
+ %s to quit"
+           (mapconcat
+            #'cddr
+            colour-menu-entries
+            "\n")
+           (propertize "SPC" 'face 'font-lock-keyword-face)
+           (propertize "ESC" 'face 'font-lock-keyword-face)))
+         (colour-menu-choice-keys
+          (append (mapcar #'car colour-menu-entries)
+                  (list ?\s)))
+         (buf (get-buffer-create "*fancy-splash-lint-colours-popup*"))
+         (good-colour-p
+          (lambda (colour)
+            (or (assoc colour fancy-splash-template-colours)
+                ;; Check if greyscale
+                (or (and (= (length colour) 4)
+                         (= (aref colour 1)   ; r
+                            (aref colour 2)   ; g
+                            (aref colour 3))) ; b
+                    (and (= (length colour) 7)
+                         (string= (substring colour 1 3)       ; rr =
+                                  (substring colour 3 5))      ; gg
+                         (string= (substring colour 3 5)       ; gg =
+                                  (substring colour 5 7))))))) ; bb
+         (prompt-to-replace
+          (lambda (target)
+            (with-current-buffer buf
+              (erase-buffer)
+              (insert (format colour-menu-template
+                              (funcall colourise-hex target)))
+              (setq-local cursor-type nil)
+              (set-buffer-modified-p nil)
+              (goto-char (point-min)))
+            (save-window-excursion
+              (pop-to-buffer buf)
+              (fit-window-to-buffer (get-buffer-window buf))
+              (car (alist-get
+                    (read-char-choice
+                     (format "Select replacement, %s-%s or SPC: "
+                             (char-to-string (caar colour-menu-entries))
+                             (char-to-string (caar (last colour-menu-entries))))
+                     colour-menu-choice-keys)
+                    colour-menu-entries))))))
+    (save-excursion
+      (goto-char (point-min))
+      (while (re-search-forward "#[0-9A-Fa-f]\\{6\\}\\|#[0-9A-Fa-f]\\{3\\}" nil t)
+        (recenter)
+        (let* ((colour (match-string 0))
+               (replacement (and (not (funcall good-colour-p colour))
+                                 (funcall prompt-to-replace colour))))
+          (when replacement
+            (replace-match replacement t t))))
+      (message "Done"))))
+#+end_src
+
+To make it easier to produce themable images, we can also provide an Inkscape
+colour palette.
+
+#+begin_src text :tangle ~/.config/inkscape/palettes/Emacs Fancy Splash.gpl :mkdirp yes
+GIMP Palette
+Name: Emacs Fancy Splash Template
+#
+ 17  17  18 #111112 Foreground
+139 140 141 #8b8c8d Shadow
+238 238 239 #eeeeef Background
+230  97   0 #e66100 Colour 1 (Highlight)
+ 28 113 216 #1c71d8 Colour 2 (Keyword)
+245 194  17 #f5c211 Colour 3 (Type)
+129  61 156 #813d9c Colour 4 (Constant)
+134  94  60 #865e3c Colour 5 (Function)
+ 46 194 126 #2ec27e Colour 6 (String)
+192  28  40 #c01c28 Colour 7 (Error)
+  0   0   1 #000001 Black
+255   0   0 #ff0000 Red
+255   0 255 #ff00ff Magenta
+  0 255   0 #00ff00 Green
+255 255   0 #ffff00 Yellow
+  0   0 255 #0000ff Blue
+  0 255 255 #00ffff Cyan
+255 255 254 #fffffe White
 #+end_src
 
 Since we're going to be generating theme-specific versions of splash images, it
@@ -2175,7 +2367,11 @@ function to get the relevant file path.
   (expand-file-name (format "%s-%s-%d.svg" theme (file-name-base template) height) fancy-splash-cache-dir))
 #+end_src
 
-Now to go about actually generating the images.
+Now to go about actually generating the images. To adjust the sizing on demand,
+we will offer two mechanisms:
+1. A special =$height= token which is replaced with the desired height
+2. Recognition of =height=100=, in which case =100= will be replaced with the
+   desired height and any =width= property will be removed.
 
 #+begin_src emacs-lisp
 (defun fancy-splash-generate-image (template height)
@@ -2184,19 +2380,34 @@ The theming is performed using `fancy-splash-template-colours'
 and the current theme."
   (with-temp-buffer
     (insert-file-contents template)
+    (goto-char (point-min))
     (if (re-search-forward "$height" nil t)
-        (replace-match (number-to-string height) nil nil)
-      (warn "fancy splash template problem: $height not found in %s" template))
+        (replace-match (number-to-string height) t t)
+      (if (re-search-forward "height=\"100\\(?:\\.0[0-9]*\\)?\"" nil t)
+          (progn
+            (replace-match (format "height=\"%s\"" height) t t)
+            (goto-char (point-min))
+            (when (re-search-forward "\\([ \t\n]\\)width=\"[\\.0-9]+\"[ \t\n]*" nil t)
+              (replace-match "\\1")))
+        (warn "Warning! fancy splash template: neither $height nor height=100 not found in %s" template)))
     (dolist (substitution fancy-splash-template-colours)
       (goto-char (point-min))
-      (let ((replacement
-               (face-attribute (plist-get (cdr substitution) :face)
-                               :foreground nil 'default)))
+      (let* ((replacement-colour
+              (face-attribute (plist-get (cdr substitution) :face)
+                              (or (plist-get (cdr substitution) :attr) :foreground)
+                              nil 'default))
+             (replacement-hex
+              (if (string-prefix-p "#" replacement-colour)
+                  replacement-colour
+                (apply 'format "#%02x%02x%02x"
+                       (mapcar (lambda (c) (ash c -8))
+                               (color-values replacement-colour))))))
         (while (search-forward (car substitution) nil t)
-          (replace-match replacement nil nil))))
+          (replace-match replacement-hex nil nil))))
     (unless (file-exists-p fancy-splash-cache-dir)
       (make-directory fancy-splash-cache-dir t))
-    (write-region nil nil (fancy-splash-filename (car custom-enabled-themes) template height) nil nil)))
+    (let ((inhibit-message t))
+      (write-region nil nil (fancy-splash-filename (car custom-enabled-themes) template height)))))
 #+end_src
 
 We may as well generate each theme's appropriate images in bunk.
@@ -2519,7 +2730,8 @@ of unnecessary keystrokes --- we can simply bind common actions to a single key!
         :desc "Find file" :ng "f" #'find-file
         :desc "Recent files" :ng "r" #'consult-recent-file
         :desc "Config dir" :ng "C" #'doom/open-private-config
-        :desc "Open config.org" :ng "c" (cmd! (find-file (expand-file-name "config.org" doom-private-dir)))
+        :desc "Open config.org" :ng "c" (cmd! (find-file (expand-file-name "config.org" doom-user-dir)))
+        :desc "Open org-mode root" :ng "O" (cmd! (find-file (expand-file-name "lisp/org/" doom-user-dir)))
         :desc "Open dotfile" :ng "." (cmd! (doom-project-find-file "~/.config/"))
         :desc "Notes (roam)" :ng "n" #'org-roam-node-find
         :desc "Switch buffer" :ng "b" #'+vertico/switch-workspace-buffer
@@ -2867,7 +3079,7 @@ alias et="e -t"
 
 *** Prompt to run setup script
 
-#+call: pkgconf("Setup script prompt")
+#+call: confpkg("Setup script prompt")
 
 At various points in this config, content is conditionally tangled to
 =./setup.sh=. It's no good just putting content there if it isn't run though.
@@ -2899,6 +3111,25 @@ anything to be run.
 #+begin_src emacs-lisp :noweb no-export
 <<run-setup()>>
 #+end_src
+
+*** Grabbing source block content as a string
+
+In a few places in this configuration, it is desirable to grab a source block's
+content as a string. We can use a noweb =<<replacement>>= form, however that
+doesn't work with string escaping.
+
+We can get around this by using noweb execution and write an name (unexported)
+babel block that will grab the content of another named source block as a
+string.
+
+#+name: grab
+#+begin_src emacs-lisp :var block-name="" :noweb-ref none
+(when-let ((block-pos (org-babel-find-named-block block-name))
+           (block (org-element-at-point block-pos)))
+  (format "%S" (string-trim (org-element-property :value block))))
+#+end_src
+
+There we go, that's all it takes! This can be used via the form =<<grab("block-name")>>=.
 
 * Packages
 ** Loading instructions
@@ -3712,7 +3943,7 @@ That's no problem though, we just need to help TRAMP find them.
 Sometimes pressing =TAB= is just too much.
 #+begin_src emacs-lisp :tangle packages.el
 (package! aas :recipe (:host github :repo "ymarco/auto-activating-snippets")
-  :pin "566944e3b336c29d3ac11cd739a954c9d112f3fb")
+  :pin "e92b5cffa4e87c221c24f3e72ae33959e1ec2b68")
 #+end_src
 
 #+begin_src emacs-lisp
@@ -3793,7 +4024,7 @@ Nested snippets are good, so let's enable that.
 
 For when you want to change the case pattern for a symbol.
 #+begin_src emacs-lisp :tangle packages.el
-(package! string-inflection :pin "fd7926ac17293e9124b31f706a4e8f38f6a9b855")
+(package! string-inflection :pin "50ad54970b3cc79b6b83979bde9889ad9a9e1a9c")
 #+end_src
 
 #+begin_src emacs-lisp
@@ -4028,7 +4259,7 @@ and colouring 🙂.
 [[https://tecosaur.com/lfs/emacs-config/screenshots/info-colours.png]]
 
 #+begin_src emacs-lisp :tangle packages.el
-(package! info-colors :pin "47ee73cc19b1049eef32c9f3e264ea7ef2aaf8a5")
+(package! info-colors :pin "2e237c301ba62f0e0286a27c1abe48c4c8441143")
 #+end_src
 *** Keycast
 
@@ -4051,13 +4282,13 @@ welcomed into Emacs 28. However, he is also rather attentive with updates, and
 so I'd like to make sure we have a recent version.
 
 #+begin_src emacs-lisp :tangle packages.el
-(package! modus-themes :pin "5d35fed1ab7d2d59f64b2c5dcf77c05e64a0322e")
+(package! modus-themes :pin "18dd2457d233859ad4d102d797d6744525177ac4")
 #+end_src
 
 *** Spacemacs themes
 
 #+begin_src emacs-lisp :tangle packages.el
-(package! spacemacs-theme :pin "e04d1f21107a1565861625209bb9c46a7aa43cc5")
+(package! spacemacs-theme :pin "1ec73d68b0f120f92538d9a329a3a46e32f74510")
 #+end_src
 *** ef-themes
 #+begin_src emacs-lisp :tangle packages.el
@@ -4232,6 +4463,16 @@ orange.
   '(doom-modeline-buffer-modified :foreground "orange"))
 #+end_src
 
+**** Height
+
+The default size (=25=) makes for a rather narrow mode line. To me, the modeline
+feels a bit comfier if we give it a bit more space. I find =45= adds roughly a
+third of the line height as padding above and below.
+
+#+begin_src emacs-lisp
+(setq doom-modeline-height 45)
+#+end_src
+
 **** File encoding
 
 While we're modifying the modeline, when we have the default file encoding (=LF
@@ -4300,7 +4541,7 @@ the obvious customisations and we've got modeline-appropriate clock generation!
 
 (defvar +doom-modeline-micro-clock-minute-resolution 1
   "The clock will be updated every this many minutes, truncating.")
-(defvar +doom-modeline-micro-clock-inverse-size 2.8
+(defvar +doom-modeline-micro-clock-inverse-size 4.8
   "The size of the clock, as an inverse proportion to the mode line height.")
 
 (defvar +doom-modeline-micro-clock--cache nil)
@@ -4454,7 +4695,7 @@ Let's just make sure this is lazy-loaded appropriately.
 
 In a similar manner to [[Keycast]], [[https://gitlab.com/ambrevar/emacs-gif-screencast][gif-screencast]] may come in handy.
 #+begin_src emacs-lisp :tangle packages.el
-(package! gif-screencast :pin "5517a557a17d8016c9e26b0acb74197550f829b9")
+(package! gif-screencast :pin "adec408e6adab2e8e057fe0ad828749f473bfb83")
 #+end_src
 
 We can lazy load this using the start/stop commands.
@@ -4712,7 +4953,7 @@ appealing, and Steve Purcell has been nice enough to make a package to display
 these as horizontal rules.
 #+begin_src emacs-lisp :tangle packages.el
 (package! page-break-lines :recipe (:host github :repo "purcell/page-break-lines")
-  :pin "cc283621c64e4f1133a63e0945658a4abecf42ef")
+  :pin "79eca86e0634ac68af862e15c8a236c37f446dcd")
 #+end_src
 
 #+begin_src emacs-lisp
@@ -4887,7 +5128,7 @@ Now, we just identify the files in question.
 
 XKCD comics are fun.
 #+begin_src emacs-lisp :tangle packages.el
-(package! xkcd :pin "688d0b4ea234adda0c05784e6bb22ab9d71f0884")
+(package! xkcd :pin "80011da2e7def8f65233d4e0d790ca60d287081d")
 #+end_src
 
 We want to set this up so it loads nicely in [[*Extra links][Extra links]].
@@ -5262,7 +5503,7 @@ we're at it.
 What's even the point of using Emacs unless you're constantly telling everyone
 about it?
 #+begin_src emacs-lisp :tangle packages.el
-(package! elcord :pin "70fd716e673b724b30b921f4cfa0033f9c02d0f2")
+(package! elcord :pin "d0c9ace493d088bc70f7422705ff27dfcf162cca")
 #+end_src
 
 #+begin_src emacs-lisp
@@ -5309,7 +5550,7 @@ good option.
 
 Then for reading them, the only currently viable options seems to be [[https://depp.brause.cc/nov.el/][nov.el]].
 #+begin_src emacs-lisp :tangle packages.el
-(package! nov :pin "8f5b42e9d9f304b422c1a7918b43ee323a7d3532")
+(package! nov :pin "cb5f45cbcfbcf263cdeb2d263eb15edefc8b07cb")
 #+end_src
 
 Together these should give me a rather good experience reading ebooks.
@@ -6210,7 +6451,7 @@ fi
 :header-args:emacs-lisp: :tangle no :noweb-ref config-mail
 :END:
 
-#+call: confpkg()
+#+call: confpkg(after="mu4e", via="require", pre="org-msg-accent")
 
 [[xkcd:1467]]
 
@@ -6884,6 +7125,7 @@ has a chance of loading. Alternatively, I may need to add the =/usr/share/= path
 #+name: add-mu4e-load-path
 #+begin_src emacs-lisp :noweb-ref none
 (cond
+ ((cl-some (lambda (path) (string-match-p "mu4e" path)) load-path) nil)
  ((file-directory-p "/usr/local/share/emacs/site-lisp/mu4e")
   (quote (add-to-list 'load-path "/usr/local/share/emacs/site-lisp/mu4e")))
  ((file-directory-p "/usr/share/emacs/site-lisp/mu4e")
@@ -6892,10 +7134,7 @@ has a chance of loading. Alternatively, I may need to add the =/usr/share/= path
 
 Let's also just shove all the Elisp code here in an src_elisp{(after! ...)} block.
 #+begin_src emacs-lisp :noweb no-export :noweb-prefix no
-<<add-mu4e-load-path()>>
-
-(after! mu4e
-  <<mu4e-conf>>)
+<<mu4e-conf>>
 #+end_src
 
 **** Viewing Mail
@@ -7181,7 +7420,7 @@ change that.
 #+begin_src emacs-lisp
 (after! mu4e
   (defvar +org-ml-target-dir
-    (expand-file-name "straight/repos/org-mode/" doom-local-dir))
+    (expand-file-name "lisp/org/" doom-user-dir))
   (defvar +org-ml-max-age 600
     "Maximum permissible age in seconds.")
   (defvar +org-ml--cache-timestamp 0)
@@ -7391,9 +7630,16 @@ Doom does a fantastic stuff with the defaults with this, so we only make a few
 minor tweaks. First, some stylistic things:
 
 #+begin_src emacs-lisp
-(setq +org-msg-accent-color "#1a5fb4"
-      org-msg-greeting-fmt "\nHi%s,\n\n"
+(setq org-msg-greeting-fmt "\nHi%s,\n\n"
       org-msg-signature "\n\n#+begin_signature\nAll the best,\\\\\n@@html:<b>@@Timothy@@html:</b>@@\n#+end_signature")
+#+end_src
+
+We also want to set the accent colour used in the Doom =mu4e= module's
+construction of the default org-msg style.
+
+# Noweb ref set to enable use with confpkg pre.
+#+begin_src emacs-lisp :noweb-ref org-msg-accent
+(setq +org-msg-accent-color "#1a5fb4")
 #+end_src
 
 Now, it would be nice to easily jump to and between the ends of the message
@@ -7672,7 +7918,7 @@ There are actually three possible package statements I may want to use for Org.
 If I'm on a machine where I can push changes, I want to be able to develop Org.
 I can check this by checking the content of the SSH key =~/.ssh/id_ed25519.pub=.
 1. If this key exists and there isn't a repo at
-   =$straight-base-dir/straight/repos/org-mode= with the right remote, we should
+   =$doom-user-dir/lisp/org= with the right remote, we should
    install it as such.
 2. If the key exists and repo are both set up, the package should just be ignored.
 3. If the key does not exist, the Org's ~HEAD~ should just be used
@@ -7682,51 +7928,45 @@ correct package statement needed.
 
 #+name: org-pkg-statement
 #+begin_src emacs-lisp :noweb-ref none
-;; (or (require 'doom (expand-file-name "lisp/doom.el"
-;;                                      (or (bound-and-true-p doom-emacs-dir)
-;;                                          user-emacs-directory)))
-;;     (setq doom-local-dir
-;;           (expand-file-name ".local/" (or (bound-and-true-p doom-emacs-dir)
-;;                                           user-emacs-directory))))
-;; (let ((dev-key (and (file-exists-p "~/.ssh/id_ed25519.pub")
-;;                     (= 0 (shell-command "cat ~/.ssh/id_ed25519.pub | grep -q AAAAC3NzaC1lZDI1NTE5AAAAIOZZqcJOLdN+QFHKyW8ST2zz750+8TdvO9IT5geXpQVt"))))
-;;       (dev-pkg (let ((default-directory (expand-file-name "straight/repos/org" doom-local-dir)))
-;;                  (and (file-exists-p default-directory)
-;;                       (string= "gitea@git.tecosaur.net:tec/org-mode.git\n" (shell-command-to-string "git remote get-url tecosaur")))))
-;;       (recipe-common '(:files (:defaults "etc")
-;;                        :build t
-;;                        :pre-build
-;;                        (with-temp-file "org-version.el"
-;;                          (let ((version
-;;                                 (version-to-list
-;;                                  (string-trim
-;;                                   (with-temp-buffer
-;;                                     (call-process "git" nil t nil
-;;                                                   "describe" "--match" "release*" "--abbrev=0" "HEAD")
-;;                                     (buffer-string))
-;;                                   "release_")))
-;;                                (git-version (string-trim
-;;                                              (with-temp-buffer
-;;                                                (call-process "git" nil t nil
-;;                                                              "rev-parse" "--short" "HEAD")
-;;                                                (buffer-string)))))
-;;                            (insert (format "(defun org-release () \"The release version of Org.\" \"%d.%d.0\")\n"
-;;                                            (car version) (1+ (cadr version))) ; Development version = MAJOR.(1+MINOR).0
-;;                                    (format "(defun org-git-version () \"The truncate git commit hash of Org mode.\" %S)\n"
-;;                                            git-version)
-;;                                    "(provide 'org-version)\n"))))))
-;;   (prin1-to-string
-;;    `(package! org
-;;       :recipe (,@(cond ((and dev-key dev-pkg)
-;;                         (list :host nil :repo nil :local-repo (expand-file-name "straight/repos/org" doom-local-dir)))
-;;                        (dev-key
-;;                         (list :host nil :repo "tec@git.savannah.gnu.org:/srv/git/emacs/org-mode.git"
-;;                               :fork (list :host nil :repo "gitea@git.tecosaur.net:tec/org-mode.git" :branch "dev" :remote "tecosaur")))
-;;                        (t
-;;                         (list :host nil :repo "https://git.tecosaur.net/mirrors/org-mode.git" :remote "mirror"
-;;                               :fork (list :host nil :repo "https://git.tecosaur.net/tec/org-mode.git" :branch "dev" :remote "tecosaur"))))
-;;                ,@recipe-common)
-;;       :pin nil)))
+(or (require 'doom (expand-file-name "lisp/doom.el"
+                                     (or (bound-and-true-p doom-emacs-dir)
+                                         user-emacs-directory)))
+    (setq doom-local-dir
+          (expand-file-name ".local/" (or (bound-and-true-p doom-emacs-dir)
+                                          user-emacs-directory))))
+(let ((dev-key-p (and (file-exists-p "~/.ssh/id_ed25519.pub")
+                      (= 0 (shell-command "cat ~/.ssh/id_ed25519.pub | grep -q AAAAC3NzaC1lZDI1NTE5AAAAIOZZqcJOLdN+QFHKyW8ST2zz750+8TdvO9IT5geXpQVt"))))
+      (recipe-common '(:files (:defaults "etc")
+                       :build t
+                       :pre-build
+                       (with-temp-file "org-version.el"
+                         (require 'lisp-mnt)
+                         (let ((version ;; (lm-version "lisp/org.el")
+                                (with-temp-buffer
+                                  (insert-file-contents "lisp/org.el")
+                                  (lm-header "version")))
+                               (git-version (string-trim
+                                             (with-temp-buffer
+                                               (call-process "git" nil t nil
+                                                             "rev-parse" "--short" "HEAD")
+                                               (buffer-string)))))
+                           (insert (format "(defun org-release () \"The release version of Org.\" %S)\n"
+                                           version)
+                                   (format "(defun org-git-version () \"The truncate git commit hash of Org mode.\" %S)\n"
+                                           git-version)
+                                   "(provide 'org-version)\n"))))))
+  (with-temp-buffer
+    (insert
+     (pp `(package! org
+            :recipe (,@(if dev-key-p
+                           (list :host nil :repo "tec@git.savannah.gnu.org:/srv/git/emacs/org-mode.git" :local-repo "lisp/org"
+                                 :fork (list :host nil :repo "gitea@git.tecosaur.net:tec/org-mode.git" :branch "dev" :remote "tecosaur"))
+                         (list :host nil :repo "https://git.tecosaur.net/mirrors/org-mode.git" :remote "mirror"
+                               :fork (list :host nil :repo "https://git.tecosaur.net/tec/org-mode.git" :branch "dev" :remote "tecosaur")))
+                     ,@recipe-common)
+            :pin nil)))
+    (untabify (point-min) (point-max))
+    (buffer-string)))
 #+end_src
 
 #+begin_src emacs-lisp :tangle packages.el :noweb no-export
@@ -7735,7 +7975,7 @@ correct package statement needed.
 (package! org-contrib
   :recipe (:host nil :repo "https://git.sr.ht/~bzg/org-contrib"
            :files ("lisp/*.el"))
-  :pin "c6aef31ccfc7c4418c3b51e98f7c3bd8e255f5e6")
+  :pin "6422b265f1150204f024e33d54f2dcfd8323005c")
 #+end_src
 
 **** Visuals
@@ -7750,7 +7990,7 @@ Fontifying =org-mode= buffers to be as pretty as possible is of paramount import
 and Minad's lovely =org-modern= goes a long way in this regard.
 
 #+begin_src emacs-lisp :tangle packages.el
-(package! org-modern :pin "537e6b75e38bc0eff083c390c257098c9fc9ab49")
+(package! org-modern :pin "7d037569bc4a05f40262ea110c4cda05c69b5c52")
 #+end_src
 
 ...with a touch of configuration...
@@ -7825,7 +8065,7 @@ and Minad's lovely =org-modern= goes a long way in this regard.
           ("name" . "⁍")
           ("header" . "›")
           ("caption" . "☰")
-          ("RESULTS" . "🠶")))
+          ("results" . "🠶")))
   (custom-set-faces! '(org-modern-statistics :inherit org-checkbox-statistics-todo)))
 #+end_src
 
@@ -7849,7 +8089,7 @@ occur at the border a bit more fiddley. We can improve this situation without
 sacrificing visual amenities with the =org-appear= package.
 #+begin_src emacs-lisp :tangle packages.el
 (package! org-appear :recipe (:host github :repo "awth13/org-appear")
-  :pin "60ba267c5da336e75e603f8c7ab3f44e6f4e4dac")
+  :pin "eb9f9db40aa529fe4b977235d86494b115281d17")
 #+end_src
 
 #+begin_src emacs-lisp
@@ -7952,7 +8192,7 @@ I like the idea of being able to make HTTP requests with Babel.
 There's a really cool package in development to /transclude/ Org document content.
 #+begin_src emacs-lisp :tangle packages.el
 (package! org-transclusion :recipe (:host github :repo "nobiot/org-transclusion")
-  :pin "5cb94542e18722bf72a281441e944a8039b5301f")
+  :pin "cf51df7b87e0d32ba13ac5380557e81d9845d81b")
 #+end_src
 
 #+begin_src emacs-lisp
@@ -8263,7 +8503,7 @@ further. This mostly consists of tweaking settings, but there is one extra
 package I'll grab for prettier in-buffer citations.
 
 #+begin_src emacs-lisp :tangle packages.el
-(package! org-cite-csl-activate :recipe (:host github :repo "andras-simonyi/org-cite-csl-activate") :pin "4fdb61c0f83b5d6db0d07dfd64d2a177fd46e931")
+(package! org-cite-csl-activate :recipe (:host github :repo "andras-simonyi/org-cite-csl-activate") :pin "9e68d9204469c674f49a20bdf7ea85da4f4bf720")
 #+end_src
 
 In particular, by setting ~org-cite-csl-activate-use-document-style~, we can have
@@ -8467,7 +8707,7 @@ functionality as in LaTeX. Let's try viewing possible output files with this.
 
 The agenda is nice, but a souped up version is nicer.
 #+begin_src emacs-lisp :tangle packages.el
-(package! org-super-agenda :pin "3108bc3f725818f0e868520d2c243abe9acbef4e")
+(package! org-super-agenda :pin "f4f528985397c833c870967884b013cf91a1da4a")
 #+end_src
 
 #+begin_src emacs-lisp
@@ -8911,7 +9151,7 @@ Org-roam is nice by itself, but there are so /extra/ nice packages which integra
 with it.
 
 #+begin_src emacs-lisp :noweb-ref none :tangle packages.el
-(package! org-roam-ui :recipe (:host github :repo "org-roam/org-roam-ui" :files ("*.el" "out")) :pin "9474a254390b1e42488a1801fed5826b32a8030b")
+(package! org-roam-ui :recipe (:host github :repo "org-roam/org-roam-ui" :files ("*.el" "out")) :pin "5ac74960231db0bf7783c2ba7a19a60f582e91ab")
 (package! websocket :pin "82b370602fa0158670b1c6c769f223159affce9b") ; dependency of `org-roam-ui'
 #+end_src
 
@@ -9950,7 +10190,7 @@ What's better than syntax-highlighted LaTeX is /rendered/ LaTeX though, and we c
 have this be performed automatically with =org-fragtog=.
 
 #+begin_src emacs-lisp :tangle packages.el
-(package! org-fragtog :pin "680606189d5d28039e6f9301b55ec80517a24005")
+(package! org-fragtog :pin "c675563af3f9ab5558cfd5ea460e2a07477b0cfd")
 #+end_src
 
 #+begin_src emacs-lisp
@@ -10882,7 +11122,7 @@ achieve this with CSS alone. Thankfully we can avoid JS though, by adapting the
 TOC generation code to use a ~label~ for each item, and a hidden ~checkbox~ to keep
 track of state.
 
-To add this, we need to change one line in [[file:~/.config/emacs/.local/straight/repos/org/lisp/ox-html.el::(format "<a href=\"#%s\">%s</a>"][org-html--format-toc-headline]].
+To add this, we need to change one line in [[file:lisp/org/lisp/ox-html.el::(format "<a href=\"#%s\">%s</a>"][org-html--format-toc-headline]].
 
 Since we can actually accomplish the desired effect by adding advice /around/ the
 function, without overriding it --- let's do that to reduce the bug surface of
@@ -11186,29 +11426,29 @@ For example, I rather like section numbers in the margin, which can be
 accomplished with
 #+name: latex-hanging-secnum
 #+begin_src LaTeX
-\\renewcommand\\sectionformat{\\llap{\\thesection\\autodot\\enskip}}
-\\renewcommand\\subsectionformat{\\llap{\\thesubsection\\autodot\\enskip}}
-\\renewcommand\\subsubsectionformat{\\llap{\\thesubsubsection\\autodot\\enskip}}
+\renewcommand\sectionformat{\llap{\thesection\autodot\enskip}}
+\renewcommand\subsectionformat{\llap{\thesubsection\autodot\enskip}}
+\renewcommand\subsubsectionformat{\llap{\thesubsubsection\autodot\enskip}}
 #+end_src
 
 It can also be nice to have big =\chapter=​s.
 #+name: latex-big-chapter
 #+begin_src LaTeX
-\\RedeclareSectionCommand[afterindent=false, beforeskip=0pt, afterskip=0pt, innerskip=0pt]{chapter}
-\\setkomafont{chapter}{\\normalfont\\Huge}
-\\renewcommand*{\\chapterheadstartvskip}{\\vspace*{0\\baselineskip}}
-\\renewcommand*{\\chapterheadendvskip}{\\vspace*{0\\baselineskip}}
-\\renewcommand*{\\chapterformat}{%
-  \\fontsize{60}{30}\\selectfont\\rlap{\\hspace{6pt}\\thechapter}}
-\\renewcommand*\\chapterlinesformat[3]{%
-  \\parbox[b]{\\dimexpr\\textwidth-0.5em\\relax}{%
-    \\raggedleft{{\\large\\scshape\\bfseries\\chapapp}\\vspace{-0.5ex}\\par\\Huge#3}}%
-    \\hfill\\makebox[0pt][l]{#2}}
+\RedeclareSectionCommand[afterindent=false, beforeskip=0pt, afterskip=0pt, innerskip=0pt]{chapter}
+\setkomafont{chapter}{\normalfont\Huge}
+\renewcommand*{\chapterheadstartvskip}{\vspace*{0\baselineskip}}
+\renewcommand*{\chapterheadendvskip}{\vspace*{0\baselineskip}}
+\renewcommand*{\chapterformat}{%
+  \fontsize{60}{30}\selectfont\rlap{\hspace{6pt}\thechapter}}
+\renewcommand*\chapterlinesformat[3]{%
+  \parbox[b]{\dimexpr\textwidth-0.5em\relax}{%
+    \raggedleft{{\large\scshape\bfseries\chapapp}\vspace{-0.5ex}\par\Huge#3}}%
+    \hfill\makebox[0pt][l]{#2}}
 #+end_src
 
 Now let's just sprinkle some KOMA all over the Org LaTeX classes.
 
-#+begin_src emacs-lisp :noweb no-export
+#+begin_src emacs-lisp :noweb no-export :noweb-prefix no
 (after! ox-latex
   (let* ((article-sections '(("\\section{%s}" . "\\section*{%s}")
                              ("\\subsection{%s}" . "\\subsection*{%s}")
@@ -11217,12 +11457,8 @@ Now let's just sprinkle some KOMA all over the Org LaTeX classes.
                              ("\\subparagraph{%s}" . "\\subparagraph*{%s}")))
          (book-sections (append '(("\\chapter{%s}" . "\\chapter*{%s}"))
                                 article-sections))
-         (hanging-secnum-preamble "
-<<latex-hanging-secnum>>
-")
-         (big-chap-preamble "
-<<latex-big-chapter>>
-"))
+         (hanging-secnum-preamble <<grab("latex-hanging-secnum")>>)
+         (big-chap-preamble <<grab("latex-big-chapter">>))
     (setcdr (assoc "article" org-latex-classes)
             `(,(concat "\\documentclass{scrartcl}" hanging-secnum-preamble)
               ,@article-sections))
@@ -11244,9 +11480,8 @@ Now let's just sprinkle some KOMA all over the Org LaTeX classes.
                    ,@book-sections))))
 
 (setq org-latex-tables-booktabs t
-      org-latex-hyperref-template "
-<<latex-fancy-hyperref>>
-"
+      org-latex-hyperref-template
+      <<grab("latex-fancy-hyperref")>>
       org-latex-reference-command "\\cref{%s}")
 #+end_src
 
@@ -11254,10 +11489,10 @@ Now let's just sprinkle some KOMA all over the Org LaTeX classes.
 The =hyperref= setup needs to be handled separately however.
 #+name: latex-fancy-hyperref
 #+begin_src LaTeX
-\\providecolor{url}{HTML}{0077bb}
-\\providecolor{link}{HTML}{882255}
-\\providecolor{cite}{HTML}{999933}
-\\hypersetup{
+\providecolor{url}{HTML}{0077bb}
+\providecolor{link}{HTML}{882255}
+\providecolor{cite}{HTML}{999933}
+\hypersetup{
   pdfauthor={%a},
   pdftitle={%t},
   pdfkeywords={%k},
@@ -11268,11 +11503,12 @@ The =hyperref= setup needs to be handled separately however.
   colorlinks=true,
   linkcolor=link,
   urlcolor=url,
-  citecolor=cite\n}
-\\urlstyle{same}
+  citecolor=cite
+}
+\urlstyle{same}
 %% hide links styles in toc
-\\NewCommandCopy{\\oldtoc}{\\tableofcontents}
-\\renewcommand{\\tableofcontents}{\\begingroup\\hypersetup{hidelinks}\\oldtoc\\endgroup}
+\NewCommandCopy{\oldtoc}{\tableofcontents}
+\renewcommand{\tableofcontents}{\begingroup\hypersetup{hidelinks}\oldtoc\endgroup}
 #+end_src
 
 **** A cleverer preamble
@@ -11284,8 +11520,8 @@ For example, I almost always want to include the snippet below.
 
 #+name: org-latex-embed-files-preamble
 #+begin_src LaTeX
-\\usepackage[main,include]{embedall}
-\\IfFileExists{./\\jobname.org}{\\embedfile[desc=The original file]{\\jobname.org}}{}
+\usepackage[main,include]{embedall}
+\IfFileExists{./\jobname.org}{\embedfile[desc=The original file]{\jobname.org}}{}
 #+end_src
 
 We could have every package we could possibly need in every one of
@@ -11310,21 +11546,21 @@ Captions could do with a bit of tweaking such that
 
 #+name: org-latex-caption-preamble
 #+begin_src LaTeX
-\\usepackage{subcaption}
-\\usepackage[hypcap=true]{caption}
-\\setkomafont{caption}{\\sffamily\\small}
-\\setkomafont{captionlabel}{\\upshape\\bfseries}
-\\captionsetup{justification=raggedright,singlelinecheck=true}
-\\usepackage{capt-of} % required by Org
+\usepackage{subcaption}
+\usepackage[hypcap=true]{caption}
+\setkomafont{caption}{\sffamily\small}
+\setkomafont{captionlabel}{\upshape\bfseries}
+\captionsetup{justification=raggedright,singlelinecheck=true}
+\usepackage{capt-of} % required by Org
 #+end_src
 
 The default checkboxes look rather ugly, so let's provide some prettier alternatives.
 
 #+name: org-latex-checkbox-preamble
 #+begin_src LaTeX
-\\newcommand{\\checkboxUnchecked}{$\\square$}
-\\newcommand{\\checkboxTransitive}{\\rlap{\\raisebox{-0.1ex}{\\hspace{0.35ex}\\Large\\textbf -}}$\\square$}
-\\newcommand{\\checkboxChecked}{\\rlap{\\raisebox{0.2ex}{\\hspace{0.35ex}\\scriptsize \\ding{52}}}$\\square$}
+\newcommand{\checkboxUnchecked}{$\square$}
+\newcommand{\checkboxTransitive}{\rlap{\raisebox{-0.1ex}{\hspace{0.35ex}\Large\textbf -}}$\square$}
+\newcommand{\checkboxChecked}{\rlap{\raisebox{0.2ex}{\hspace{0.35ex}\scriptsize \ding{52}}}$\square$}
 #+end_src
 
 It's nice to have "message blocks", things like info/warning/error/success.
@@ -11332,57 +11568,53 @@ A LaTeX macro should make them trivial to create.
 
 #+name: org-latex-box-preamble
 #+begin_src LaTeX
-\\ExplSyntaxOn
-\\NewCoffin\\Content
-\\NewCoffin\\SideRule
-\\NewDocumentCommand{\\defsimplebox}{O{\\ding{117}} O{0.36em} m m m}{%
+\ExplSyntaxOn
+\NewCoffin\Content
+\NewCoffin\SideRule
+\NewDocumentCommand{\defsimplebox}{O{\ding{117}} O{0.36em} m m m}{%
   % #1 ding, #2 ding offset, #3 name, #4 colour, #5 default label
-  \\definecolor{#3}{HTML}{#4}
-  \\NewDocumentEnvironment{#3}{ O{#5} }
+  \definecolor{#3}{HTML}{#4}
+  \NewDocumentEnvironment{#3}{ O{#5} }
   {
-    \\vcoffin_set:Nnw \\Content { \\linewidth }
-    \\noindent \\ignorespaces
-    \\par\\vspace{-0.7\\baselineskip}%
-    \\textcolor{#3}{#1}~\\textcolor{#3}{\\textbf{##1}}%
-    \\vspace{-0.8\\baselineskip}
-    \\begin{addmargin}[1em]{1em}
+    \vcoffin_set:Nnw \Content { \linewidth }
+    \noindent \ignorespaces
+    \par\vspace{-0.7\baselineskip}%
+    \textcolor{#3}{#1}~\textcolor{#3}{\textbf{##1}}%
+    \vspace{-0.8\baselineskip}
+    \begin{addmargin}[1em]{1em}
     }
     {
-    \\end{addmargin}
-    \\vspace{-0.5\\baselineskip}
-    \\vcoffin_set_end:
-    \\SetHorizontalCoffin\\SideRule{\\color{#3}\\rule{1pt}{\\CoffinTotalHeight\\Content}}
-    \\JoinCoffins*\\Content[l,t]\\SideRule[l,t](#2,-0.7em)
-    \\noindent\\TypesetCoffin\\Content
-    \\vspace*{\\CoffinTotalHeight\\Content}\\bigskip
-    \\vspace{-2\\baselineskip}
+    \end{addmargin}
+    \vspace{-0.5\baselineskip}
+    \vcoffin_set_end:
+    \SetHorizontalCoffin\SideRule{\color{#3}\rule{1pt}{\CoffinTotalHeight\Content}}
+    \JoinCoffins*\Content[l,t]\SideRule[l,t](#2,-0.7em)
+    \noindent\TypesetCoffin\Content
+    \vspace*{\CoffinTotalHeight\Content}\bigskip
+    \vspace{-2\baselineskip}
   }
 }
-\\ExplSyntaxOff
+\ExplSyntaxOff
 #+end_src
 
 Lastly, we will pass this content into some global variables we for ease of
 access.
 
-#+begin_src emacs-lisp :noweb no-export
-(defvar org-latex-embed-files-preamble "
-<<org-latex-embed-files-preamble>>
-"
+#+begin_src emacs-lisp :noweb no-export :noweb-prefix no
+(defvar org-latex-embed-files-preamble
+  <<grab("org-latex-embed-files-preamble")>>
   "Preamble that embeds files within the pdf.")
 
-(defvar org-latex-caption-preamble "
-<<org-latex-caption-preamble>>
-"
+(defvar org-latex-caption-preamble
+  <<grab("org-latex-caption-preamble")>>
   "Preamble that improves captions.")
 
-(defvar org-latex-checkbox-preamble "
-<<org-latex-checkbox-preamble>>
-"
+(defvar org-latex-checkbox-preamble
+  <<grab("org-latex-checkbox-preamble")>>
   "Preamble that improves checkboxes.")
 
-(defvar org-latex-box-preamble "
-<<org-latex-box-preamble>>
-"
+(defvar org-latex-box-preamble
+  <<grab("org-latex-box-preamble")>>
   "Preamble that provides a macro for custom boxes.")
 #+end_src
 
@@ -11399,14 +11631,35 @@ can embed whatever we want.
    (lambda (file-desc)
      (format "\\IfFileExists{%1$s}{\\embedfile[desc=%2$s]{%1$s}}{}"
              (thread-last (car file-desc)
-               (replace-regexp-in-string "\\\\" "\\\\\\\\")
-               (replace-regexp-in-string "~" "\\\\string~"))
+                          (replace-regexp-in-string "\\\\" "\\\\\\\\")
+                          (replace-regexp-in-string "~" "\\\\string~"))
              (cdr file-desc)))
    (append
-    (mapcar (lambda (f-block)
-              (let ((file-lang (cons (or (car f-block) (caddr (cadr f-block))) (caadr f-block))))
-                (cons (car file-lang) (format "Tangled %s file" (cdr file-lang)))))
-            (org-babel-tangle-collect-blocks)) ; all files being tangled to
+    (let (tangle-fspecs) ; All files being tangled to.
+      (org-babel-map-src-blocks nil
+        (when-let ((info (and (not (org-in-commented-heading-p))
+                              (not (org-in-archived-heading-p))
+                              (org-babel-get-src-block-info 'no-eval)))
+                   (tangle-value
+                    (pcase (alist-get :tangle (caddr info))
+                      ((and (pred (string-match-p "^(.*)$")) expr)
+                       (eval (read expr)))
+                      (val val)))
+                   (tangle-file
+                    (pcase tangle-value
+                      ((or "no" (guard (member (alist-get :export-embed (caddr info)) '("no" "nil"))))
+                       nil)
+                      ("yes"
+                       (file-name-with-extension
+                        (file-name-nondirectory (buffer-file-name))
+                        (or (alist-get (car info) org-babel-tangle-lang-exts nil nil #'equal)
+                            (car info))))
+
+                      (val val))))
+          (push
+           (cons tangle-file (format "Tangled %s file" (car info)))
+           tangle-fspecs)))
+      (nreverse tangle-fspecs))
     (let (extra-files)
       (save-excursion
         (goto-char (point-min))
@@ -11777,53 +12030,53 @@ This will accomplish the following:
 
 #+name: latex-cover-page
 #+begin_src LaTeX
-\\usepackage{tikz}
-\\usetikzlibrary{shapes.geometric}
-\\usetikzlibrary{calc}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric}
+\usetikzlibrary{calc}
 
-\\newsavebox\\orgicon
-\\begin{lrbox}{\\orgicon}
-  \\begin{tikzpicture}[y=0.80pt, x=0.80pt, inner sep=0pt, outer sep=0pt]
-    \\path[fill=black!6] (16.15,24.00) .. controls (15.58,24.00) and (13.99,20.69) .. (12.77,18.06)arc(215.55:180.20:2.19) .. controls (12.33,19.91) and (11.27,19.09) .. (11.43,18.05) .. controls (11.36,18.09) and (10.17,17.83) .. (10.17,17.82) .. controls (9.94,18.75) and (9.37,19.44) .. (9.02,18.39) .. controls (8.32,16.72) and (8.14,15.40) .. (9.13,13.80) .. controls (8.22,9.74) and (2.18,7.75) .. (2.81,4.47) .. controls (2.99,4.47) and (4.45,0.99) .. (9.15,2.41) .. controls (14.71,3.99) and (17.77,0.30) .. (18.13,0.04) .. controls (18.65,-0.49) and (16.78,4.61) .. (12.83,6.90) .. controls (10.49,8.18) and (11.96,10.38) .. (12.12,11.15) .. controls (12.12,11.15) and (14.00,9.84) .. (15.36,11.85) .. controls (16.58,11.53) and (17.40,12.07) .. (18.46,11.69) .. controls (19.10,11.41) and (21.79,11.58) .. (20.79,13.08) .. controls (20.79,13.08) and (21.71,13.90) .. (21.80,13.99) .. controls (21.97,14.75) and (21.59,14.91) .. (21.47,15.12) .. controls (21.44,15.60) and (21.04,15.79) .. (20.55,15.44) .. controls (19.45,15.64) and (18.36,15.55) .. (17.83,15.59) .. controls (16.65,15.76) and (15.67,16.38) .. (15.67,16.38) .. controls (15.40,17.19) and (14.82,17.01) .. (14.09,17.32) .. controls (14.70,18.69) and (14.76,19.32) .. (15.50,21.32) .. controls (15.76,22.37) and (16.54,24.00) .. (16.15,24.00) -- cycle(7.83,16.74) .. controls (6.83,15.71) and (5.72,15.70) .. (4.05,15.42) .. controls (2.75,15.19) and (0.39,12.97) .. (0.02,10.68) .. controls (-0.02,10.07) and (-0.06,8.50) .. (0.45,7.18) .. controls (0.94,6.05) and (1.27,5.45) .. (2.29,4.85) .. controls (1.41,8.02) and (7.59,10.18) .. (8.55,13.80) -- (8.55,13.80) .. controls (7.73,15.00) and (7.80,15.64) .. (7.83,16.74) -- cycle;
-  \\end{tikzpicture}
-\\end{lrbox}
+\newsavebox\orgicon
+\begin{lrbox}{\orgicon}
+  \begin{tikzpicture}[y=0.80pt, x=0.80pt, inner sep=0pt, outer sep=0pt]
+    \path[fill=black!6] (16.15,24.00) .. controls (15.58,24.00) and (13.99,20.69) .. (12.77,18.06)arc(215.55:180.20:2.19) .. controls (12.33,19.91) and (11.27,19.09) .. (11.43,18.05) .. controls (11.36,18.09) and (10.17,17.83) .. (10.17,17.82) .. controls (9.94,18.75) and (9.37,19.44) .. (9.02,18.39) .. controls (8.32,16.72) and (8.14,15.40) .. (9.13,13.80) .. controls (8.22,9.74) and (2.18,7.75) .. (2.81,4.47) .. controls (2.99,4.47) and (4.45,0.99) .. (9.15,2.41) .. controls (14.71,3.99) and (17.77,0.30) .. (18.13,0.04) .. controls (18.65,-0.49) and (16.78,4.61) .. (12.83,6.90) .. controls (10.49,8.18) and (11.96,10.38) .. (12.12,11.15) .. controls (12.12,11.15) and (14.00,9.84) .. (15.36,11.85) .. controls (16.58,11.53) and (17.40,12.07) .. (18.46,11.69) .. controls (19.10,11.41) and (21.79,11.58) .. (20.79,13.08) .. controls (20.79,13.08) and (21.71,13.90) .. (21.80,13.99) .. controls (21.97,14.75) and (21.59,14.91) .. (21.47,15.12) .. controls (21.44,15.60) and (21.04,15.79) .. (20.55,15.44) .. controls (19.45,15.64) and (18.36,15.55) .. (17.83,15.59) .. controls (16.65,15.76) and (15.67,16.38) .. (15.67,16.38) .. controls (15.40,17.19) and (14.82,17.01) .. (14.09,17.32) .. controls (14.70,18.69) and (14.76,19.32) .. (15.50,21.32) .. controls (15.76,22.37) and (16.54,24.00) .. (16.15,24.00) -- cycle(7.83,16.74) .. controls (6.83,15.71) and (5.72,15.70) .. (4.05,15.42) .. controls (2.75,15.19) and (0.39,12.97) .. (0.02,10.68) .. controls (-0.02,10.07) and (-0.06,8.50) .. (0.45,7.18) .. controls (0.94,6.05) and (1.27,5.45) .. (2.29,4.85) .. controls (1.41,8.02) and (7.59,10.18) .. (8.55,13.80) -- (8.55,13.80) .. controls (7.73,15.00) and (7.80,15.64) .. (7.83,16.74) -- cycle;
+  \end{tikzpicture}
+\end{lrbox}
 
-\\makeatletter
-\\g@addto@macro\\tableofcontents{\\clearpage}
-\\renewcommand\\maketitle{
-  \\thispagestyle{empty}
-  \\hyphenpenalty=10000 % hyphens look bad in titles
-  \\renewcommand{\\baselinestretch}{1.1}
-  \\NewCommandCopy{\\oldtoday}{\\today}
-  \\renewcommand{\\today}{\\LARGE\\number\\year\\\\\\large%
-    \\ifcase \\month \\or Jan\\or Feb\\or Mar\\or Apr\\or May \\or Jun\\or Jul\\or Aug\\or Sep\\or Oct\\or Nov\\or Dec\\fi
-    ~\\number\\day}
-  \\begin{tikzpicture}[remember picture,overlay]
+\makeatletter
+\g@addto@macro\tableofcontents{\clearpage}
+\renewcommand\maketitle{
+  \thispagestyle{empty}
+  \hyphenpenalty=10000 % hyphens look bad in titles
+  \renewcommand{\baselinestretch}{1.1}
+  \NewCommandCopy{\oldtoday}{\today}
+  \renewcommand{\today}{\LARGE\number\year\\\large%
+    \ifcase \month \or Jan\or Feb\or Mar\or Apr\or May \or Jun\or Jul\or Aug\or Sep\or Oct\or Nov\or Dec\fi
+    ~\number\day}
+  \begin{tikzpicture}[remember picture,overlay]
     %% Background Polygons %%
-    \\foreach \\i in {2.5,...,22} % bottom left
-    {\\node[rounded corners,black!3.5,draw,regular polygon,regular polygon sides=6, minimum size=\\i cm,ultra thick] at ($(current page.west)+(2.5,-4.2)$) {} ;}
-    \\foreach \\i in {0.5,...,22} % top left
-    {\\node[rounded corners,black!5,draw,regular polygon,regular polygon sides=6, minimum size=\\i cm,ultra thick] at ($(current page.north west)+(2.5,2)$) {} ;}
-    \\node[rounded corners,fill=black!4,regular polygon,regular polygon sides=6, minimum size=5.5 cm,ultra thick] at ($(current page.north west)+(2.5,2)$) {};
-    \\foreach \\i in {0.5,...,24} % top right
-    {\\node[rounded corners,black!2,draw,regular polygon,regular polygon sides=6, minimum size=\\i cm,ultra thick] at ($(current page.north east)+(0,-8.5)$) {} ;}
-    \\node[fill=black!3,rounded corners,regular polygon,regular polygon sides=6, minimum size=2.5 cm,ultra thick] at ($(current page.north east)+(0,-8.5)$) {};
-    \\foreach \\i in {21,...,3} % bottom right
-    {\\node[black!3,rounded corners,draw,regular polygon,regular polygon sides=6, minimum size=\\i cm,ultra thick] at ($(current page.south east)+(-1.5,0.75)$) {} ;}
-    \\node[fill=black!3,rounded corners,regular polygon,regular polygon sides=6, minimum size=2 cm,ultra thick] at ($(current page.south east)+(-1.5,0.75)$) {};
-    \\node[align=center, scale=1.4] at ($(current page.south east)+(-1.5,0.75)$) {\\usebox\\orgicon};
+    \foreach \i in {2.5,...,22} % bottom left
+    {\node[rounded corners,black!3.5,draw,regular polygon,regular polygon sides=6, minimum size=\i cm,ultra thick] at ($(current page.west)+(2.5,-4.2)$) {} ;}
+    \foreach \i in {0.5,...,22} % top left
+    {\node[rounded corners,black!5,draw,regular polygon,regular polygon sides=6, minimum size=\i cm,ultra thick] at ($(current page.north west)+(2.5,2)$) {} ;}
+    \node[rounded corners,fill=black!4,regular polygon,regular polygon sides=6, minimum size=5.5 cm,ultra thick] at ($(current page.north west)+(2.5,2)$) {};
+    \foreach \i in {0.5,...,24} % top right
+    {\node[rounded corners,black!2,draw,regular polygon,regular polygon sides=6, minimum size=\i cm,ultra thick] at ($(current page.north east)+(0,-8.5)$) {} ;}
+    \node[fill=black!3,rounded corners,regular polygon,regular polygon sides=6, minimum size=2.5 cm,ultra thick] at ($(current page.north east)+(0,-8.5)$) {};
+    \foreach \i in {21,...,3} % bottom right
+    {\node[black!3,rounded corners,draw,regular polygon,regular polygon sides=6, minimum size=\i cm,ultra thick] at ($(current page.south east)+(-1.5,0.75)$) {} ;}
+    \node[fill=black!3,rounded corners,regular polygon,regular polygon sides=6, minimum size=2 cm,ultra thick] at ($(current page.south east)+(-1.5,0.75)$) {};
+    \node[align=center, scale=1.4] at ($(current page.south east)+(-1.5,0.75)$) {\usebox\orgicon};
     %% Text %%
-    \\node[left, align=right, black, text width=0.8\\paperwidth, minimum height=3cm, rounded corners,font=\\Huge\\bfseries] at ($(current page.north east)+(-2,-8.5)$)
-    {\\@title};
-    \\node[left, align=right, black, text width=0.8\\paperwidth, minimum height=2cm, rounded corners, font=\\Large] at ($(current page.north east)+(-2,-11.8)$)
-    {\\scshape \\@author};
-    \\renewcommand{\\baselinestretch}{0.75}
-    \\node[align=center,rounded corners,fill=black!3,text=black,regular polygon,regular polygon sides=6, minimum size=2.5 cm,inner sep=0, font=\\Large\\bfseries ] at ($(current page.west)+(2.5,-4.2)$)
-    {\\@date};
-  \\end{tikzpicture}
-  \\let\\today\\oldtoday
-  \\clearpage}
-\\makeatother
+    \node[left, align=right, black, text width=0.8\paperwidth, minimum height=3cm, rounded corners,font=\Huge\bfseries] at ($(current page.north east)+(-2,-8.5)$)
+    {\@title};
+    \node[left, align=right, black, text width=0.8\paperwidth, minimum height=2cm, rounded corners, font=\Large] at ($(current page.north east)+(-2,-11.8)$)
+    {\scshape \@author};
+    \renewcommand{\baselinestretch}{0.75}
+    \node[align=center,rounded corners,fill=black!3,text=black,regular polygon,regular polygon sides=6, minimum size=2.5 cm,inner sep=0, font=\Large\bfseries ] at ($(current page.west)+(2.5,-4.2)$)
+    {\@date};
+  \end{tikzpicture}
+  \let\today\oldtoday
+  \clearpage}
+\makeatother
 #+end_src
 
 Now we've got a nice cover page to work with, we just need to use it every now
@@ -11833,7 +12086,7 @@ or not a cover page should be used based on the word count --- I'll have this be
 the global default. Then we just want to insert a LaTeX snippet tweak the
 subtitle format to use the cover page.
 
-#+begin_src emacs-lisp :noweb no-export
+#+begin_src emacs-lisp :noweb no-export :noweb-prefix no
 (defvar org-latex-cover-page 'auto
   "When t, use a cover page by default.
 When auto, use a cover page when the document's wordcount exceeds
@@ -11845,10 +12098,9 @@ Set with #+option: coverpage:{yes,auto,no} in org buffers.")
 This condition is applied when cover page option is set to auto.")
 (defvar org-latex-subtitle-coverpage-format "\\\\\\bigskip\n\\LARGE\\mdseries\\itshape\\color{black!80} %s\\par"
   "Variant of `org-latex-subtitle-format' to use with the cover page.")
-(defvar org-latex-cover-page-maketitle "
-<<latex-cover-page>>
-"
-  "LaTeX snippet for the preamble that sets \\maketitle to produce a cover page.")
+(defvar org-latex-cover-page-maketitle
+  <<grab("latex-cover-page")>>
+  "LaTeX preamble snippet that sets \\maketitle to produce a cover page.")
 
 (eval '(cl-pushnew '(:latex-cover-page nil "coverpage" org-latex-cover-page)
                    (org-export-backend-options (org-export-get-backend 'latex))))
@@ -11884,20 +12136,20 @@ much space it puts between list items by default. I'm generally not a fan.
 Thankfully this is easy to correct with a small snippet:
 #+name: latex-condense-lists
 #+begin_src LaTeX
-\\newcommand{\\setuplistspacing}{\\setlength{\\itemsep}{-0.5ex}\\setlength{\\parskip}{1.5ex}\\setlength{\\parsep}{0pt}}
-\\let\\olditem\\itemize\\renewcommand{\\itemize}{\\olditem\\setuplistspacing}
-\\let\\oldenum\\enumerate\\renewcommand{\\enumerate}{\\oldenum\\setuplistspacing}
-\\let\\olddesc\\description\\renewcommand{\\description}{\\olddesc\\setuplistspacing}
+\newcommand{\setuplistspacing}{\setlength{\itemsep}{-0.5ex}\setlength{\parskip}{1.5ex}\setlength{\parsep}{0pt}}
+\let\olditem\itemize\renewcommand{\itemize}{\olditem\setuplistspacing}
+\let\oldenum\enumerate\renewcommand{\enumerate}{\oldenum\setuplistspacing}
+\let\olddesc\description\renewcommand{\description}{\olddesc\setuplistspacing}
 #+end_src
 
 Then we can just hook this in with our clever preamble.
 
-#+begin_src emacs-lisp :noweb no-export
+#+begin_src emacs-lisp :noweb no-export :noweb-prefix no
 (defvar org-latex-condense-lists t
   "Reduce the space between list items.")
-(defvar org-latex-condensed-lists "
-<<latex-condense-lists>>
-")
+(defvar org-latex-condensed-lists
+  <<grab("latex-condense-lists")>>
+  "LaTeX preamble snippet that reduces the space between list items.")
 
 (add-to-list 'org-export-conditional-features (cons (lambda (_info) (and org-latex-condense-lists "^[ \t]*[-+]\\|^[ \t]*[1Aa][.)] ")) 'condensed-lists) t)
 (add-to-list 'org-latex-feature-implementations '(condensed-lists :snippet org-latex-condensed-lists :order 0.7) t)
@@ -12007,20 +12259,20 @@ this just as a fallback font (when it isn't a pain to do so).
 
 #+name: julia-mono-fontspec
 #+begin_src LaTeX
-\\ifcsname directlua\\endcsname
-  \\usepackage{fontspec}
-  \\newfontfamily\\JuliaMono{JuliaMono-Regular.ttf}[Path=/usr/share/fonts/truetype/, Extension=.ttf]
-  \\newfontface\\JuliaMonoRegular{JuliaMono-Regular}
-  \\setmonofont{JuliaMonoRegular}[Contextuals=Alternate, Scale=MatchLowercase]
-\\fi
+\ifcsname directlua\endcsname
+  \usepackage{fontspec}
+  \newfontfamily\JuliaMono{JuliaMono-Regular.ttf}[Path=/usr/share/fonts/truetype/, Extension=.ttf]
+  \newfontface\JuliaMonoRegular{JuliaMono-Regular}
+  \setmonofont{JuliaMonoRegular}[Contextuals=Alternate, Scale=MatchLowercase]
+\fi
 #+end_src
 
 Now all that remains is to hook this into the preamble generation.
 
-#+begin_src emacs-lisp :noweb no-export
-(setq org-latex-julia-mono-fontspec "
-<<julia-mono-fontspec>>
-")
+#+begin_src emacs-lisp :noweb no-export :noweb-prefix no
+(defvar org-latex-julia-mono-fontspec
+  <<grab("julia-mono-fontspec")>>
+  "LaTeX preamble snippet that sets LuaLaTeX's fontspec to use Julia Mono.")
 
 (add-to-list 'org-latex-feature-implementations '(julia-code :when code :snippet org-latex-julia-mono-fontspec :order 0) t)
 (add-to-list 'org-export-conditional-features '("^[ \t]*#\\+begin_src julia\\|^[ \t]*#\\+BEGIN_SRC julia\\|src_julia" . julia-code) t)
@@ -12031,83 +12283,224 @@ Now all that remains is to hook this into the preamble generation.
 
 **** Emojis
 
+#+call: confpkg("ox-latex-emoji", after="ox-latex", prefix="")
+
 It would be nice to actually include emojis where used.
 Thanks to =emojify=, we have a folder of emoji images just sitting and waiting to
 be used 🙂.
 
-First up, we want to detect when emojis are actually present. We can try
-checking the unicode ranges with a collection of =[?-?]= regex groups, but Emojis
-are actually spread around a fair bit and so this isn't very straightforward.
-Instead I can iterate thorough non-ASCII characters and check if any have the
-text property =emojified=.
+First up, we want to detect when emojis are actually present. Manually
+constructing a regex for this would be a huge pain with the way the codepoints
+are scattered around, but thanks to ~char-script-table~ we don't have to!
 
 #+begin_src emacs-lisp
-(defun emojify-emoji-in-buffer-p ()
-  "Determine if any emojis are present in the current buffer, using `emojify-mode'."
-  (require 'emojify)
-  (unless emojify-mode
-    (emojify-mode 1)
-    (emojify-display-emojis-in-region (point-min) (point-max)))
-  (let (emoji-found end)
-    (save-excursion
-      (goto-char (point-min))
-      (while (not (or emoji-found end))
-        (if-let ((pos (re-search-forward "[^[:ascii:]]" nil t)))
-            (when (get-text-property (1- pos) 'emojified)
-              (setq emoji-found t))
-          (setq end t))))
-    emoji-found))
+(defvar org-latex-emoji--rx
+  (let (emojis)
+    (map-char-table
+     (lambda (char set)
+       (when (eq set 'emoji)
+         (push (copy-tree char) emojis)))
+     char-script-table)
+    (rx-to-string `(any ,@emojis)))
+  "A regexp to find all emoji-script characters.")
+#+end_src
+
+Once we've found an Emoji, we would like to include it in LaTeX. We'll set up
+the infrastructure for this with the help of two packages
++ =accsupp=, to provide the copy-paste text overlay
++ =transparent=, to provide invisible text to enable text copying at the image
+
+With these packages we can insert an emoji image at the point and then place
+some invisible text on-top of it that copies as the emoji codepoint.
+
+Unfortunately though, =accsupp= doesn't seem to accept five digit hexadecimal
+codepoints at this point in time, instead we need to convert to UTF-16 surrogate
+pairs, so we'll give our =\DeclareEmoji= command two arguments: one for the
+non-surrogate form required by =\DeclareUnicodeCharacter=, and another for the
+surrogate form required by =\BeginAccSupp=.
+
+#+name: latex-emoji-preamble
+#+begin_src LaTeX
+\usepackage{accsupp}
+\usepackage{transparent}
+\newsavebox\emojibox
+
+\NewDocumentCommand\DeclareEmoji{m m}{% UTF-8 codepoint, UTF-16 codepoint
+  \DeclareUnicodeCharacter{#1}{%
+    \sbox\emojibox{\raisebox{OFFSET}{%
+        \includegraphics[height=HEIGHT]{EMOJI-FOLDER/#1}}}%
+    \usebox\emojibox
+    \llap{%
+      \resizebox{\wd\emojibox}{\height}{%
+        \BeginAccSupp{method=hex,unicode,ActualText=#2}%
+        \texttransparent{0}{X}%
+        \EndAccSupp{}}}}}
 #+end_src
 
 Once we know that there are emojis present we can add a bit of preamble to the
 buffer to make insertion easier.
 
-#+begin_src emacs-lisp
-(defun org-latex-emoji-setup ()
-  (format "\\newcommand\\emoji[1]{\\raisebox{-0.3ex}{\\includegraphics[height=1.8ex]{%s/#1}}}" (emojify-image-dir)))
+#+begin_src emacs-lisp :noweb no-export :noweb-prefix no
+(defconst org-latex-emoji-base-dir
+  (expand-file-name "emojis/" doom-cache-dir)
+  "Directory where emojis should be saved and look for.")
 
-(add-to-list 'org-export-conditional-features (cons (lambda (_info) (emojify-emoji-in-buffer-p)) 'emoji) t)
-(add-to-list 'org-latex-feature-implementations (list 'emoji :requires 'image :snippet (lambda (_info) (org-latex-emoji-setup)) :order 3 ))
+(defvar org-latex-emoji-sets
+  '(("twemoji" :url "https://github.com/twitter/twemoji/archive/refs/tags/v14.0.2.zip"
+     :folder "twemoji-14.0.2/assets/svg" :height "1.8ex" :offset "-0.3ex")
+    ("twemoji-bw" :url "https://github.com/youdly/twemoji-color-font/archive/refs/heads/v11-release.zip"
+     :folder "twemoji-color-font-11-release/assets/builds/svg-bw" :height "1.8ex" :offset "-0.3ex")
+    ("openmoji" :url "https://github.com/hfg-gmuend/openmoji/releases/latest/download/openmoji-svg-color.zip"
+     :height "2.2ex" :offset "-0.45ex")
+    ("openmoji-bw" :url "https://github.com/hfg-gmuend/openmoji/releases/latest/download/openmoji-svg-black.zip"
+     :height "2.2ex" :offset "-0.45ex")
+    ("emojione" :url "https://github.com/joypixels/emojione/archive/refs/tags/v2.2.7.zip"
+     :folder "emojione-2.2.7/assets/svg") ; Warning, poor coverage
+    ("noto" :url "https://github.com/googlefonts/noto-emoji/archive/refs/tags/v2.038.zip"
+     :folder "noto-emoji-2.038/svg" :file-regexp "^emoji_u\\([0-9a-f_]+\\)"
+     :height "2.0ex" :offset "-0.3ex"))
+  "An alist of plistst of emoji sets.
+Specified with the minimal form:
+  (\"SET-NAME\" :url \"URL\")
+The following optional parameters are supported:
+  :folder (defaults to \"\")
+  The folder within the archive where the emojis exist.
+  :file-regexp (defaults to nil)
+  Pattern with the emoji code point as the first capture group.
+  :height (defaults to \"1.8ex\")
+  Height of the emojis to be used.
+  :offset (defaults to \"-0.3ex\")
+  Baseline offset of the emojis.")
+
+(defconst org-latex-emoji-keyword
+  "LATEX_EMOJI_SET"
+  "Keyword used to set the emoji set from `org-latex-emoji-sets'.")
+
+(defvar org-latex-emoji-preamble <<grab("latex-emoji-preamble")>>
+  "LaTeX preamble snippet that will allow for emojis to be declared.
+Contains the string \"EMOJI-FOLDER\" which should be replaced with
+the path to the emoji folder.")
+
+(defun org-latex-emoji-utf16 (char)
+  "Return the pair of UTF-16 surrogates that represent CHAR."
+  (list
+   (+ #xD7C0 (ash char -10))
+   (+ #xDC00 (logand char #x03FF))))
+
+(defun org-latex-emoji-declaration (char)
+  "Construct the LaTeX command declaring CHAR as an emoji."
+  (format "\\DeclareEmoji{%X}{%s} %% %s"
+          char
+          (if (< char #xFFFF)
+              (format "%X" char)
+            (apply #'format "%X%X" (org-latex-emoji-utf16 char)))
+          (capitalize (get-char-code-property char 'name))))
+
+(defun org-latex-emoji-fill-preamble (emoji-folder &optional height offset svg-p)
+  "Fill in `org-latex-emoji-preamble' with EMOJI-FOLDER, HEIGHT, and OFFSET.
+If SVG-P is set \"includegraphics\" will be replaced with \"includesvg\"."
+  (let* (case-fold-search
+         (filled-preamble
+          (replace-regexp-in-string
+           "HEIGHT"
+           (or height "1.8ex")
+           (replace-regexp-in-string
+            "OFFSET"
+            (or offset "-0.3ex")
+            (replace-regexp-in-string
+             "EMOJI-FOLDER"
+             (directory-file-name
+              (if (getenv "HOME")
+                  (replace-regexp-in-string
+                   (regexp-quote (getenv "HOME"))
+                   "\\string~"
+                   emoji-folder t t)
+                emoji-folder))
+             org-latex-emoji-preamble t t)
+            t t)
+           t t)))
+    (if svg-p
+        (replace-regexp-in-string
+         "includegraphics" "includesvg"
+         filled-preamble t t)
+      filled-preamble)))
+
+(defun org-latex-emoji-setup (&optional info)
+  "Construct a preamble snippet to set up emojis based on INFO."
+  (let* ((emoji-set
+          (or (org-element-map
+                  (plist-get info :parse-tree)
+                  'keyword
+                (lambda (keyword)
+                  (and (string= (org-element-property :key keyword)
+                                org-latex-emoji-keyword)
+                       (org-element-property :value keyword)))
+                info t)
+              (caar org-latex-emoji-sets)))
+         (emoji-spec (cdr (assoc emoji-set org-latex-emoji-sets)))
+         (emoji-folder
+          (expand-file-name emoji-set org-latex-emoji-base-dir))
+         (emoji-svg-only
+          (and (file-exists-p emoji-folder)
+               (not (cl-some
+                     (lambda (path)
+                       (not (string= (file-name-extension path) "svg")))
+                     (directory-files emoji-folder nil "\\....$"))))))
+    (cond
+     ((not emoji-spec)
+      (error "Emoji set `%s' is unknown. Try one of: %s" emoji-set
+             (string-join (mapcar #'car org-latex-emoji-sets) ", ")))
+     ((not (file-exists-p emoji-folder))
+      (if (and (not noninteractive)
+               (yes-or-no-p (format "Emoji set `%s' is not installed, would you like to install it?" emoji-set)))
+          (org-latex-emoji-install
+           emoji-set
+           (or (executable-find "cairosvg") (executable-find "inkscape")))
+        (error "Emoji set `%s' is not installed" emoji-set))))
+    (concat
+     (org-latex-emoji-fill-preamble
+      emoji-folder (plist-get emoji-spec :height)
+      (plist-get emoji-spec :offset) emoji-svg-only)
+     "\n\n"
+     (mapconcat
+      #'org-latex-emoji-declaration
+      (let (unicode-cars)
+        (save-excursion
+          (goto-char (point-min))
+          (while (re-search-forward org-latex-emoji--rx nil t)
+            (push (aref (match-string 0) 0) unicode-cars)))
+        (cl-delete-duplicates unicode-cars))
+      "\n")
+     "\n")))
+
+(add-to-list 'org-export-conditional-features
+             (cons (lambda (_info)
+                     (save-excursion
+                       (goto-char (point-min))
+                       (re-search-forward org-latex-emoji--rx nil t)))
+                   'emoji)
+             t)
+
+(add-to-list 'org-latex-feature-implementations
+             (list 'emoji :requires 'image :snippet #'org-latex-emoji-setup :order 3))
 #+end_src
 
-Once again making use of =emojify=, we can generate LaTeX commands for our emojis
-fairly easily.
+Unfortunately this isn't a global solution, as LuaLaTeX doesn't have
+=\DeclareUnicodeCharacter=. However, we can fix this with a hack for the one case
+when we know it will be used.
 
 #+begin_src emacs-lisp
-(defun emojify-latexify-emoji-in-buffer ()
-  (unless emojify-mode
-    (emojify-mode 1)
-    (emojify-display-emojis-in-region (point-min) (point-max)))
-  (let (end)
-    (save-excursion
-      (goto-char (point-min))
-      (while (not end)
-        (if-let ((pos (re-search-forward "[^[:ascii:]]\\{1,2\\}" nil t)))
-            (when-let ((char (get-text-property (1- pos) 'emojify-text))
-                       (emoji (emojify-get-emoji char)))
-              (replace-match (format "\\\\emoji{%s}" (file-name-sans-extension (ht-get emoji "image")))))
-          (setq end t))))))
-#+end_src
-
-Now we just need to hook this handy function into Org's export.
-We can't use standard string-replacement as we rely on the buffer modifications
-enacted by src_elisp{(emojify-mode)}.
-
-As I have not yet implemented a nice way of sharing feature detection
-information outside of src_elisp{(org-latex-generate-features-preamble)}, we'll
-use the same check before attempting to LaTeXify emojis and hope that nothing
-strange happens.
-
-#+begin_src emacs-lisp
-(defun +org-latex-convert-emojis (text backend _info)
-  (when (org-export-derived-backend-p backend 'latex)
-    (with-temp-buffer
-      (insert text)
-      (when (emojify-emoji-in-buffer-p)
-        (emojify-latexify-emoji-in-buffer)
-        (buffer-string)))))
-
-(add-to-list 'org-export-filter-final-output-functions #'+org-latex-convert-emojis)
+(add-to-list 'org-latex-feature-implementations
+             '(.emoji-lualatex-hack
+               :when (emoji julia-code) ; LuaLaTeX is used with julia-code.
+               :eager t
+               :snippet
+               "\
+\\usepackage{newunicodechar}
+\\newcommand{\\DeclareUnicodeCharacter}[2]{%
+    \\begingroup\\lccode`|=\\string\"#1\\relax
+    \\lowercase{\\endgroup\\newunicodechar{|}}{#2}}"
+               :order 2.9))
 #+end_src
 
 This works fairly nicely, there's just one little QOL upgrade that we can
@@ -12115,9 +12508,8 @@ perform. =emojify= downloads the ~72x72~ versions of Twemoji, however SVG versio
 are also produced. We could use ~inkscape~ to convert those to PDFs, which would
 likely be best for including.
 
-First, it's worth checking whether =.pdf= graphics files will be prioritised over
-=.png= files. If so, that would be ideal as no extra effort is required past
-fetching and converting the files.
+This works fairly nicely, but it would be good to use =.pdf= forms whenever
+possible. We can use =texdef= to check the file extension priority list.
 
 #+begin_src shell :tangle no :exports both :results output verbatim :wrap example
 texdef -t pdflatex -p graphicx Gin@extensions
@@ -12129,32 +12521,84 @@ texdef -t pdflatex -p graphicx Gin@extensions
 macro:->.pdf,.png,.jpg,.mps,.jpeg,.jbig2,.jb2,.PDF,.PNG,.JPG,.JPEG,.JBIG2,.JB2,.eps
 #+end_example
 
-Fantastic! We can see that =.pdf= actually comes first in the priority list. So
-now we just need to fetch and convert those SVGs --- ideally with a handy
-command to do so for us.
+Fantastic! We can see that =.pdf= actually comes first in the priority list.
+Now we just need to fetch and convert the emoji images.
 
 #+begin_src emacs-lisp
-(defun org-latex-emoji-install-vector-graphics ()
-  "Dowload, convert, and install vector emojis for use with LaTeX."
-  (interactive)
-  (let ((dir (org-latex-emoji-install-vector-graphics--download)))
-    (org-latex-emoji-install-vector-graphics--convert dir)
-    (org-latex-emoji-install-vector-graphics--install dir))
-  (message "Vector emojis installed."))
+(defun org-latex-emoji-install (set &optional convert)
+  "Dowload, convert, and install emojis for use with LaTeX."
+  (interactive
+   (list (completing-read "Emoji set to install: "
+                          (mapcar
+                           (lambda (set-spec)
+                             (if (file-exists-p (expand-file-name (car set-spec) org-latex-emoji-base-dir))
+                                 (propertize (car set-spec) 'face 'font-lock-doc-face)
+                               (car set-spec)))
+                           org-latex-emoji-sets)
+                          nil t)
+         (if (or (executable-find "cairosvg") (executable-find "inkscape"))
+             (yes-or-no-p "Would you like to create .pdf forms of the Emojis (strongly recommended)?")
+           (message "Install `cairosvg' (recommended) or `inkscape' to convert to PDF forms")
+           nil)))
+  (let ((emoji-folder (expand-file-name set org-latex-emoji-base-dir)))
+    (when (or (not (file-exists-p emoji-folder))
+              (and (not noninteractive)
+                   (yes-or-no-p "Emoji folder already present, would you like to re-download?")
+                   (progn (delete-directory emoji-folder) t)))
+      (let* ((spec (cdr (assoc set org-latex-emoji-sets)))
+             (dir (org-latex-emoji-install--download set (plist-get spec :url)))
+             (svg-dir (expand-file-name (or (plist-get spec :folder) "") dir)))
+        (org-latex-emoji-install--install
+         set svg-dir (plist-get spec :file-regexp))))
+    (when convert
+      (org-latex-emoji-install--convert (file-name-as-directory emoji-folder))))
+  (message "Emojis set `%s' installed." set))
 
-(defun org-latex-emoji-install-vector-graphics--download ()
-  (message "Locating latest emojis...")
-  (let* ((twemoji-url (substring (shell-command-to-string "echo \"https://github.com$(curl -sL https://github.com/twitter/twemoji/releases/latest | grep '.zip\"' | cut -d '\"' -f 2)\"") 0 -1))
-         (twemoji-version (replace-regexp-in-string "^.*tags/v\\(.*\\)\\.zip" "\\1" twemoji-url))
-         (twemoji-dest-folder (make-temp-file "twemoji-" t)))
-    (message "Downloading Twemoji v%s" twemoji-version)
-    (let ((default-directory twemoji-dest-folder))
-      (call-process "curl" nil nil nil "-L" twemoji-url "--output" "twemoji.zip")
+(defun org-latex-emoji-install--download (name url)
+  "Download the emoji archive URL for the set NAME."
+  (let* ((dest-folder (make-temp-file (format "%s-" name) t)))
+    (message "Downloading %s..." name)
+    (let ((default-directory dest-folder))
+      (call-process "curl" nil nil nil "-sL" url "--output" "emojis.zip")
       (message "Unzipping")
-      (call-process "unzip" nil nil nil "twemoji.zip")
-      (concat twemoji-dest-folder "/twemoji-" twemoji-version "/assets/svg"))))
+      (call-process "unzip" nil nil nil "emojis.zip")
+      dest-folder)))
 
-(defun org-latex-emoji-install-vector-graphics--convert (dir)
+(defun org-latex-emoji-install--install (name dir &optional filename-regexp)
+  "Install the emoji files in DIR to the NAME set folder.
+If a FILENAME-REGEXP, only files matching this regexp will be moved,
+and they will be renamed to the first capture group of the regexp."
+  (message "Installing %s emojis into emoji directory" name)
+  (let ((images (append (directory-files dir t ".*.svg")
+                        (directory-files dir t ".*.pdf")))
+        (emoji-dir (file-name-as-directory
+                    (expand-file-name name org-latex-emoji-base-dir))))
+    (unless (file-exists-p emoji-dir)
+      (make-directory emoji-dir t))
+    (mapc
+     (lambda (image)
+       (if filename-regexp
+           (when (string-match filename-regexp (file-name-nondirectory image))
+             (rename-file image
+                          (expand-file-name
+                           (file-name-with-extension
+                            (upcase (match-string 1 (file-name-nondirectory image)))
+                            (file-name-extension image))
+                           emoji-dir)
+                          t))
+         (rename-file image
+                      (expand-file-name
+                       (file-name-with-extension
+                        (upcase (file-name-nondirectory image))
+                        (file-name-extension image))
+                       emoji-dir)
+                      t)))
+     images)
+    (message "%d emojis installed" (length images))))
+
+(defun org-latex-emoji-install--convert (dir)
+  "Convert all .svg files in DIR to .pdf forms.
+Uses cairosvg if possible, falling back to inkscape."
   (let ((default-directory dir))
     (if (executable-find "cairosvg") ; cairo's PDFs are ~10% smaller
         (let* ((images (directory-files dir nil ".*.svg"))
@@ -12164,7 +12608,8 @@ command to do so for us.
                (threads 0))
           (while (< index num-images)
             (setf threads (1+ threads))
-            (message "Converting emoji %d/%d (%s)" (1+ index) num-images (nth index images))
+            (let (message-log-max)
+              (message "Converting emoji %d/%d (%s)" (1+ index) num-images (nth index images)))
             (make-process :name "cairosvg"
                           :command (list "cairosvg" (nth index images) "-o" (concat (file-name-sans-extension (nth index images)) ".pdf"))
                           :sentinel (lambda (proc msg)
@@ -12174,18 +12619,10 @@ command to do so for us.
             (while (> threads max-threads)
               (sleep-for 0.01)))
           (while (> threads 0)
-            (sleep-for 0.01))
-          (message "Finished conversion!")))
-    (shell-command "inkscape --batch-process --export-type='pdf' *.svg")))
-
-(defun org-latex-emoji-install-vector-graphics--install (dir)
-  (message "Installing vector emojis into emoji directory")
-  (let ((images (directory-files dir t ".*.pdf"))
-        (emoji-dir (concat (emojify-image-dir) "/")))
-    (mapcar
-     (lambda (image)
-       (rename-file image emoji-dir t))
-     images)))
+            (sleep-for 0.01)))
+      (message "Cairosvg not found. Proceeding with inkscape as a fallback.")
+      (shell-command "inkscape --batch-process --export-type='pdf' *.svg"))
+    (message "Finished conversion!")))
 #+end_src
 
 **** Remove non-ascii chars
@@ -12217,8 +12654,11 @@ since we want to let emoji processing occur first.
     (let (case-replace)
       (replace-regexp-in-string "[^[:ascii:]]"
                                 (lambda (nonascii)
-                                  (if (string-match-p +org-pdflatex-inputenc-encoded-chars nonascii) nonascii
-                                    (or (cdr (assoc nonascii +org-latex-non-ascii-char-substitutions)) "¿")))
+                                  (if (or (string-match-p +org-pdflatex-inputenc-encoded-chars nonascii)
+                                          (string-match-p org-latex-emoji--rx nonascii))
+                                      nonascii
+                                    (or (cdr (assoc nonascii +org-latex-non-ascii-char-substitutions))
+                                        "¿")))
                                 text))))
 
 (add-to-list 'org-export-filter-plain-text-functions #'+org-latex-replace-non-ascii-chars t)
@@ -12466,8 +12906,9 @@ export to a PDF.
 
 #+name: org-missing-latex-packages
 #+begin_src emacs-lisp :noweb-ref none :var org-latex-required-packages-list=org-latex-required-packages-list[,0] :var org-latex-font-packages-list=org-latex-font-packages-list
-(setq org-required-latex-packages (append org-latex-required-packages-list
-                                          (mapcar #'car org-latex-font-packages-list)))
+(setq org-required-latex-packages
+      (append org-latex-required-packages-list
+              org-latex-font-packages-list))
 
 (defun check-for-latex-packages (packages)
   (delq nil (mapcar (lambda (package)
@@ -12526,36 +12967,46 @@ It's nice to use a different theme
 When using metropolis though, we want to make a few tweaks:
 #+name: beamer-metropolis-tweaks
 #+begin_src LaTeX
-\\NewCommandCopy{\\moldusetheme}{\\usetheme}
-\\renewcommand*{\\usetheme}[2][]{\\moldusetheme[#1]{#2}
-  \\setbeamertemplate{items}{$\\bullet$}
-  \\setbeamerfont{block title}{size=\\normalsize, series=\\bfseries\\parbox{0pt}{\\rule{0pt}{4ex}}}}
+\NewCommandCopy{\moldusetheme}{\usetheme}
+\renewcommand*{\usetheme}[2][]{\moldusetheme[#1]{#2}
+  \setbeamertemplate{items}{$\bullet$}
+  \setbeamerfont{block title}{size=\normalsize, series=\bfseries\parbox{0pt}{\rule{0pt}{4ex}}}}
 
-\\makeatletter
-\\newcommand{\\setmetropolislinewidth}{
-  \\setlength{\\metropolis@progressinheadfoot@linewidth}{1.2px}}
-\\makeatother
+\makeatletter
+\newcommand{\setmetropolislinewidth}{
+  \setlength{\metropolis@progressinheadfoot@linewidth}{1.2px}}
+\makeatother
 
-\\usepackage{etoolbox}
-\\AtEndPreamble{\\setmetropolislinewidth}
+\usepackage{etoolbox}
+\AtEndPreamble{\setmetropolislinewidth}
 #+end_src
 
 Now let's just apply this along with some extra beamer tweaks.
 
-#+begin_src emacs-lisp :noweb no-export
+#+begin_src emacs-lisp :noweb no-export :noweb-prefix no
 (defun org-beamer-p (info)
   (eq 'beamer (and (plist-get info :back-end)
                    (org-export-backend-name (plist-get info :back-end)))))
 
-(add-to-list 'org-export-conditional-features '(org-beamer-p . beamer) t)
-(add-to-list 'org-latex-feature-implementations '(beamer :requires .missing-koma :prevents (italic-quotes condensed-lists)) t)
-(add-to-list 'org-latex-feature-implementations '(.missing-koma :snippet "\\usepackage{scrextend}" :order 2) t)
+(add-to-list 'org-export-conditional-features
+             '(org-beamer-p . beamer) t)
+(add-to-list 'org-latex-feature-implementations
+             '(beamer :requires .missing-koma :prevents (italic-quotes condensed-lists)) t)
+(add-to-list 'org-latex-feature-implementations
+             '(.missing-koma :snippet "\\usepackage{scrextend}" :order 2) t)
 
-(defvar org-beamer-metropolis-tweaks "
-<<beamer-metropolis-tweaks>>
-")
-(add-to-list 'org-export-conditional-features (cons (lambda (info) (and (org-beamer-p info) (string-match-p "metropolis$" org-beamer-theme))) 'beamer-metropolis) t)
-(add-to-list 'org-latex-feature-implementations '(beamer-metropolis :requires beamer :snippet org-beamer-metropolis-tweaks :order 3) t)
+(defvar org-beamer-metropolis-tweaks
+  <<grab("beamer-metropolis-tweaks")>>
+  "LaTeX preamble snippet that tweaks the Beamer metropolis theme styling.")
+
+(add-to-list 'org-export-conditional-features
+             (cons (lambda (info)
+                     (and (org-beamer-p info)
+                          (string-match-p "metropolis$" org-beamer-theme)))
+                   'beamer-metropolis)
+             t)
+(add-to-list 'org-latex-feature-implementations
+             '(beamer-metropolis :requires beamer :snippet org-beamer-metropolis-tweaks :order 3) t)
 #+end_src
 
 And I think that it's natural to divide a presentation into sections, e.g.
@@ -12665,7 +13116,7 @@ elements (a lot of them). So ~ox-gfm~ is handy for exporting markdown with all t
 features that GitHub has.
 
 #+begin_src emacs-lisp :noweb-ref none :tangle packages.el
-(package! ox-gfm :pin "99f93011b069e02b37c9660b8fcb45dab086a07f")
+(package! ox-gfm :pin "46faa67dbb3fb0cd7a76c3fe518f16e4195c22c7")
 #+end_src
 
 #+begin_src emacs-lisp
@@ -13387,7 +13838,7 @@ update-mime-database ~/.local/share/mime
 Graphviz is a nice method of visualising simple graphs, based on plaintext
 =.dot= / =.gv= files.
 #+begin_src emacs-lisp :tangle packages.el
-(package! graphviz-dot-mode :pin "6e96a89762760935a7dff6b18393396f6498f976")
+(package! graphviz-dot-mode :pin "46afe4825b4a3a5d1a1ac65ec7f585051f756b78")
 #+end_src
 
 #+begin_src emacs-lisp
@@ -13449,7 +13900,7 @@ Of course, there's an Emacs mode for this.
 
 #+begin_src emacs-lisp :tangle packages.el
 (package! beancount :recipe (:host github :repo "beancount/beancount-mode")
-  :pin "ea8257881b7e276e8d170d724e3b2e179f25cb77")
+  :pin "687775da63784d153a3c1cfee9801090c6b51842")
 #+end_src
 
 #+begin_src emacs-lisp
