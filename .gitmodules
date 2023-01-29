@@ -46,3 +46,6 @@
 [submodule "simple-comment-markup"]
 	path = lisp/simple-comment-markup
 	url = https://git.tecosaur.net/tec/simple-comment-markup.git
+[submodule "lisp/writegood-mode"]
+	path = lisp/writegood-mode
+	url = https://github.com/bnbeckwith/writegood-mode.git

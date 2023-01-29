@@ -1462,7 +1462,6 @@ I'd much rather have my new buffers in ~org-mode~ than ~fundamental-mode~, hence
 #+end_src
 For some reason this + the mixed pitch hook causes issues with hydra and so I'll
 just need to resort to =SPC b o= for now.
-
 ** Doom configuration
 :PROPERTIES:
 :header-args:emacs-lisp: :tangle no :noweb-ref config-doom
@@ -1583,7 +1582,7 @@ ophints                      ; highlight the region an operation acts on
 ;;(tabs                      ; an tab bar for Emacs
 ;;  +centaur-tabs)           ; ... with prettier tabs
 treemacs                     ; a project drawer, like neotree but cooler
-unicode                      ; extended unicode support for various languages
+unicode                    ; extended unicode support for various languages
 (vc-gutter +pretty)          ; vcs diff in the fringe
 vi-tilde-fringe              ; fringe tildes to mark beyond EOB
 (window-select +numbers)     ; visually switch windows
@@ -1675,8 +1674,8 @@ associated file.
 #+name: doom-lang
 #+begin_src emacs-lisp
 ;;agda                       ; types of types of types of types...
-;;beancount                  ; mind the GAAP
-(cc +lsp)                    ; C/C++/Obj-C madness
+beancount                    ; mind the GAAP
+(cc +lsp)                    ; C > C++ == 1
 ;;clojure                    ; java with a lisp
 ;;common-lisp                ; if you've seen one lisp, you've seen them all
 ;;coq                        ; proofs-as-programs
@@ -1696,15 +1695,15 @@ ess                          ; emacs speaks statistics
 ;;fsharp                     ; ML stands for Microsoft's Language
 ;;fstar                      ; (dependent) types and (monadic) effects and Z3
 ;;gdscript                   ; the language you waited for
-;;(go +lsp)                  ; the hipster dialect
 (graphql +lsp)             ; Give queries a REST
+(go +lsp)                    ; the hipster dialect
 ;;(haskell +lsp)             ; a language that's lazier than I am
 ;;hy                         ; readability of scheme w/ speed of python
 ;;idris                      ;
 json                         ; At least it ain't XML
 (java +lsp)                  ; the poster child for carpal tunnel syndrome
 (javascript +lsp)            ; all(hope(abandon(ye(who(enter(here))))))
-;; (julia +lsp)                 ; Python, R, and MATLAB in a blender (Disabled as no M1 support)
+(julia +lsp)                 ; a better, faster MATLAB
 kotlin                       ; a better, slicker Java(Script)
 (latex                       ; writing papers in Emacs has never been so fun
  +latexmk                    ; what else would you use?
@@ -3133,10 +3132,21 @@ string. Note that this does not currently expand nested noweb references.
      (lambda (src)
        (when (and (not (org-in-commented-heading-p nil src))
                   (not (org-in-archived-heading-p nil src))
-                  (equal (alist-get :noweb-ref (org-babel-parse-header-arguments
-                                                (org-element-property :parameters src) t))
-                         name))
-         (push (string-trim-right (org-element-property :value src) "\n")
+                  (let* ((lang (org-element-property :language src))
+                         (params
+                          (apply
+                           #'org-babel-merge-params
+                           (append
+                            (org-with-point-at (org-element-property :begin src)
+                              (org-babel-params-from-properties lang t))
+                            (mapcar
+                             (lambda (h)
+                               (org-babel-parse-header-arguments h t))
+                             (cons (org-element-property :parameters src)
+                                   (org-element-property :header src))))))
+                         (ref (alist-get :noweb-ref params)))
+                    (equal ref name)))
+         (push (org-babel--normalize-body src)
                block-contents)))
      :granularity 'element
      :restrict-elements '(src-block))
@@ -3539,6 +3549,8 @@ already clear, and there's no need for a different face.
   (set-face-attribute 'consult-file nil :inherit 'consult-buffer)
   (setf (plist-get (alist-get 'perl consult-async-split-styles-alist) :initial) ";"))
 #+end_src
+Unfortunately this seems to mess things up, which is something I'll want to look
+into later.
 
 *** Magit
 :PROPERTIES:
@@ -3724,6 +3736,10 @@ Now we can make use of the package for this.
 #+begin_src emacs-lisp :tangle packages.el :noweb-ref none
 ;; (package! magit-delta :recipe (:host github :repo "dandavison/magit-delta") :pin "5fc7dbddcfacfe46d3fd876172ad02a9ab6ac616")
 #+end_src
+*** Projectile
+#+begin_quote
+From the =:core packages= module.
+#+end_quote
 
 All that's left is to hook it into magit
 #+begin_src emacs-lisp :noweb-ref none
@@ -3875,6 +3891,7 @@ tar -xjf "aspell6-en-custom.tar.bz2"
 cd aspell6-en-custom
 ./configure && make && sudo make install
 #+end_src
+*** Auto activating snippets
 
 **** Configuration
 :PROPERTIES:
@@ -3898,6 +3915,13 @@ nearby (also means that if I change the 'main' dictionary I keep my addition).
 #+begin_src emacs-lisp
 (setq ispell-personal-dictionary
       (expand-file-name "misc/ispell_personal" doom-private-dir))
+#+end_src
+
+*** Screenshot
+
+This makes it a breeze to take lovely screenshots.
+#+begin_src emacs-lisp :tangle packages.el
+(package! screenshot :recipe (:local-repo "lisp/screenshot"))
 #+end_src
 
 *** TRAMP
@@ -4309,6 +4333,7 @@ so I'd like to make sure we have a recent version.
 #+begin_src emacs-lisp :tangle packages.el
 (package! spacemacs-theme :pin "1ec73d68b0f120f92538d9a329a3a46e32f74510")
 #+end_src
+
 *** ef-themes
 #+begin_src emacs-lisp :tangle packages.el
 (package! ef-themes :recipe (:host github :repo "protesilaos/ef-themes"))
@@ -4379,6 +4404,7 @@ for this, so I made one.
 #+begin_src emacs-lisp :tangle packages.el
 (package! simple-comment-markup :recipe (:local-repo "lisp/simple-comment-markup"))
 #+end_src
+*** Keycast
 
 Let's use both basic Org markup and Markdown code backticks, to cover most
 situations decently.
@@ -4402,20 +4428,14 @@ From the =:ui emoji= module.
 #+end_quote
 
 
-For starters, twitter's emojis look nicer than emoji-one.
-Other than that, this is pretty great OOTB 😀.
+#+attr_html: :class invertible :alt Screenshot of Keycast-mode in action
+[[https://tecosaur.com/lfs/emacs-config/screenshots/keycast.png]]
 
-#+begin_src emacs-lisp
-(setq emojify-emoji-set "twemoji-v2")
+#+begin_src emacs-lisp :tangle packages.el
+(package! keycast :pin "04ba7519f34421c235bac458f0192c130f732f12")
 #+end_src
 
-One minor annoyance is the use of emojis over the default character
-when the default is actually preferred. This occurs with overlay symbols I use
-in Org mode, such as checkbox state, and a few other miscellaneous cases.
-
-We can accommodate our preferences by deleting those entries from the emoji hash
-table
-
+Let's just make sure this is lazy-loaded appropriately.
 #+begin_src emacs-lisp
 (defvar emojify-disabled-emojis
   '(;; Org
@@ -4817,6 +4837,10 @@ Thankfully, it isn't to hard to add these to the ~composition-function-table~.
 (set-char-table-range composition-function-table ?f '(["\\(?:ff?[fijlt]\\)" 0 font-shape-gstring]))
 (set-char-table-range composition-function-table ?T '(["\\(?:Th\\)" 0 font-shape-gstring]))
 #+end_src
+*** Marginalia
+#+begin_quote
+Part of the =:completion vertico= module.
+#+end_quote
 
 **** Variable pitch serif font
 :PROPERTIES:
@@ -4928,6 +4952,15 @@ inside the src_elisp{(after! ... )} block ¯\_(ツ)_/¯.
 Then let's change the font to a sans serif, but the default one doesn't fit too
 well somehow, so let's switch to 'P22 Underground Book'; it looks much nicer.
 
+We want to make the tabs a nice, comfy size (~36~), with icons. The modifier
+marker is nice, but the particular default Unicode one causes a lag spike, so
+let's just switch to an ~o~, which still looks decent but doesn't cause any
+issues.
+A 'active-bar' is nice, so let's have one of those. If we have it ~under~ needs us to
+turn on ~x-underline-at-decent~ though. For some reason this didn't seem to work
+inside the src_elisp{(after! ... )} block ¯\_(ツ)_/¯.
+Then let's change the font to a sans serif, but the default one doesn't fit too
+well somehow, so let's switch to 'P22 Underground Book'; it looks much nicer.
 #+begin_src emacs-lisp
 (after! centaur-tabs
   (centaur-tabs-mode -1)
@@ -4952,13 +4985,9 @@ well somehow, so let's switch to 'P22 Underground Book'; it looks much nicer.
 From the =:core packages= module.
 #+end_quote
 
-=all-the-icons= does a generally great job giving file names icons. One minor
-niggle I have is that when /I/ open a =.m= file, it's much more likely to be Matlab
-than Objective-C. As such, it'll be switching the icon associated with =.m=.
-#+begin_src emacs-lisp
-(after! all-the-icons
-  (setcdr (assoc "m" all-the-icons-extension-icon-alist)
-          (cdr (assoc "matlab" all-the-icons-extension-icon-alist))))
+
+#+begin_src emacs-lisp :tangle (if (executable-find "wal") "yes" "no")
+(run-with-idle-timer 0.1 nil (lambda () (add-hook 'doom-load-theme-hook 'theme-magic-from-emacs)))
 #+end_src
 *** Prettier page breaks
 :PROPERTIES:
@@ -5130,6 +5159,18 @@ Now, we just identify the files in question.
         "*/.auctex-auto"
         "*/_region_.log"
         "*/_region_.tex"))
+#+end_src
+
+#+begin_src emacs-lisp
+(use-package! page-break-lines
+  :commands page-break-lines-mode
+  :init
+  (autoload 'turn-on-page-break-lines-mode "page-break-lines")
+  :config
+  (setq page-break-lines-max-width fill-column)
+  (map! :prefix "g"
+        :desc "Prev page break" :nv "[" #'backward-page
+        :desc "Next page break" :nv "]" #'forward-page))
 #+end_src
 
 *** imenu list
@@ -7690,7 +7731,6 @@ We can replace the evil binding of =mu4e-compose-goto-bottom= with this function
       :after org-msg
       :n "G" #'+org-msg-goto-body)
 #+end_src
-
 It would also be good to call this when replying to a message. This has to be
 implemented as advice as the compose hooks are run before ~mu4e~compose-handler~
 moves the point with ~message-goto-<location>~.
@@ -7702,37 +7742,6 @@ moves the point with ~message-goto-<location>~.
     (+org-msg-goto-body)))
 
 (advice-add 'mu4e~compose-handler :after #'+org-msg-goto-body-when-replying)
-#+end_src
-
-** Michel2 (Google Tasks)
-
-#+begin_src emacs-lisp
-(defun michel()
-    (interactive)
-    (let ((michel-buf (generate-new-buffer "Emacs Michel")))
-        (switch-to-buffer michel-buf)
-        (insert "=== Emacs Michel ===\n")
-        (let* ((michel-proc (start-process "michel" michel-buf "michel")))
-            (if (string-equal system-type "windows-nt") ;; HACK, use latin-1 or your
-                (set-buffer-process-coding-system 'cp1251 'cp1251)) ;; encoding here
-            (comint-mode)
-            (set-process-sentinel michel-proc
-                `(lambda (p e) (if (eq (current-buffer) ,michel-buf)
-                    (progn
-                    (insert "====================\n")
-                    (sit-for 3)
-                    (kill-buffer))))))))
-#+end_src
-
-** Org Gcal (Google Calendar)
-Get the GCP client ID & the secret from environment variables
-
-#+begin_src emacs-lisp
-(require 'org-gcal)
-(setq org-gcal-client-id (getenv "ORG_GCAL_CLIENT_ID")
-      org-gcal-client-secret (getenv "ORG_GCAL_CLIENT_SECRET")
-      org-gcal-fetch-file-alist `((,(print (getenv "ORG_GCAL_CAL_ID_1")) . "~/orgfiles/org/nextcloud/Himanshu/cal-gmail.org")
-                                  (,(print (getenv "ORG_GCAL_CAL_ID_2")) . "~/orgfiles/org/nextcloud/Family/cal-family.org")))
 #+end_src
 
 * Language configuration
@@ -7786,6 +7795,8 @@ numbers is stripped away.
 
 (defun +setup-text-mode-left-margin ()
   (when (and (derived-mode-p 'text-mode)
+             (not (and (bound-and-true-p visual-fill-column-mode)
+                       visual-fill-column-center-text))
              (eq (current-buffer) ; Check current buffer is active.
                  (window-buffer (frame-selected-window))))
     (setq left-margin-width (if display-line-numbers
@@ -8404,14 +8415,15 @@ It's nice to be able to link to music
 **** Tweaking defaults
 
 #+begin_src emacs-lisp
-(setq org-directory "~/orgfiles/org"       ; let's put files here
-      org-use-property-inheritance t       ; It's convenient to have properties inherited.
-      org-log-done 'time                   ; Having the time a item is done sounds convenient.
-      org-list-allow-alphabetical t        ; Have a. A. a) A) list bullets.
-      org-catch-invisible-edits 'smart     ; Try not to accidently do weird stuff in invisible regions.
-      org-export-with-sub-superscripts '{} ; Don't treat lone _ / ^ as sub/superscripts, require _{} / ^{}.
-      org-export-allow-bind-keywords t     ; Bind keywords can be handy
-      org-image-actual-width '(0.9))       ; Make the in-buffer display closer to the exported result..
+(setq org-directory "~/orgfiles/org") ; Let's put files here.
+      org-agenda-files (list org-directory)                  ; Seems like the obvious place.
+      org-use-property-inheritance t                         ; It's convenient to have properties inherited.
+      org-log-done 'time                                     ; Having the time a item is done sounds convenient.
+      org-list-allow-alphabetical t                          ; Have a. A. a) A) list bullets.
+      org-catch-invisible-edits 'smart                       ; Try not to accidently do weird stuff in invisible regions.
+      org-export-with-sub-superscripts '{}                   ; Don't treat lone _ / ^ as sub/superscripts, require _{} / ^{}.
+      org-export-allow-bind-keywords t                       ; Bind keywords can be handy
+      org-image-actual-width '(0.9))                         ; Make the in-buffer display closer to the exported result..
 #+end_src
 I also like the src_elisp{:comments} header-argument, so let's make that a
 default.
@@ -8559,7 +8571,7 @@ with =citar=, and make the symbols a bit prettier.
 
 #+begin_src emacs-lisp
 (after! citar
-  (setq citar-bibliography
+  (setq org-cite-global-bibliography
         (let ((libfile-search-names '("library.json" "Library.json" "library.bib" "Library.bib"))
               (libfile-dir "~/Zotero")
               paths)
@@ -8567,68 +8579,43 @@ with =citar=, and make the symbols a bit prettier.
             (when (and (not paths)
                        (file-exists-p (expand-file-name libfile libfile-dir)))
               (setq paths (list (expand-file-name libfile libfile-dir)))))
-          paths))
-  (setq citar-symbols
+          paths)
+        citar-bibliography org-cite-global-bibliography
+        citar-symbols
         `((file ,(all-the-icons-faicon "file-o" :face 'all-the-icons-green :v-adjust -0.1) . " ")
           (note ,(all-the-icons-material "speaker_notes" :face 'all-the-icons-blue :v-adjust -0.3) . " ")
           (link ,(all-the-icons-octicon "link" :face 'all-the-icons-orange :v-adjust 0.01) . " "))))
 #+end_src
 
-We can also make the Zotero CSL styles available to use.
-
-#+begin_src emacs-lisp
-(after! oc-csl
-  (setq org-cite-csl-styles-dir "~/Zotero/styles"))
-#+end_src
-
-Since CSL works so nicely everywhere, we might as well use it as the default
-citation export processor for everything.
-
+I think it would be nice to have a function to convert =org-ref= citations to
+=org-cite=
 #+begin_src emacs-lisp
 (after! oc
-  (setq org-cite-export-processors '((t csl))))
-#+end_src
-
-Then, for convenience we'll cap things off by putting the citation command under
-Org's localleader.
-
-#+begin_src emacs-lisp
-(map! :after org
-      :map org-mode-map
-      :localleader
-      :desc "Insert citation" "@" #'org-cite-insert)
-#+end_src
-
-Lastly, just in case I come across any old citations of mine, I think it would
-be nice to have a function to convert =org-ref= citations to =org-cite= forms.
-
-#+begin_src emacs-lisp
-;(after! oc
-;  (defun org-ref-to-org-cite ()
-;    "Attempt to convert org-ref citations to org-cite syntax."
-;    (interactive)
-;    (let* ((cite-conversions '(("cite" . "//b") ("Cite" . "//bc")
-;                               ("nocite" . "/n")
-;                               ("citep" . "") ("citep*" . "//f")
-;                               ("parencite" . "") ("Parencite" . "//c")
-;                               ("citeauthor" . "/a/f") ("citeauthor*" . "/a")
-;                               ("citeyear" . "/na/b")
-;                               ("Citep" . "//c") ("Citealp" . "//bc")
-;                               ("Citeauthor" . "/a/cf") ("Citeauthor*" . "/a/c")
-;                               ("autocite" . "") ("Autocite" . "//c")
-;                               ("notecite" . "/l/b") ("Notecite" . "/l/bc")
-;                               ("pnotecite" . "/l") ("Pnotecite" . "/l/bc")))
-;           (cite-regexp (rx (regexp (regexp-opt (mapcar #'car cite-conversions) t))
-;                            ":" (group (+ (not (any "\n   ,.)]}")))))))
-;      (save-excursion
-;        (goto-char (point-min))
-;        (while (re-search-forward cite-regexp nil t)
-;          (message (format "[cite%s:@%s]"
-;                                 (cdr (assoc (match-string 1) cite-conversions))
-;                                 (match-string 2)))
-;          (replace-match (format "[cite%s:@%s]"
-;                                 (cdr (assoc (match-string 1) cite-conversions))
-;                                 (match-string 2))))))))
+  (defun org-ref-to-org-cite ()
+    "Attempt to convert org-ref citations to org-cite syntax."
+    (interactive)
+    (let* ((cite-conversions '(("cite" . "//b") ("Cite" . "//bc")
+                               ("nocite" . "/n")
+                               ("citep" . "") ("citep*" . "//f")
+                               ("parencite" . "") ("Parencite" . "//c")
+                               ("citeauthor" . "/a/f") ("citeauthor*" . "/a")
+                               ("citeyear" . "/na/b")
+                               ("Citep" . "//c") ("Citealp" . "//bc")
+                               ("Citeauthor" . "/a/cf") ("Citeauthor*" . "/a/c")
+                               ("autocite" . "") ("Autocite" . "//c")
+                               ("notecite" . "/l/b") ("Notecite" . "/l/bc")
+                               ("pnotecite" . "/l") ("Pnotecite" . "/l/bc")))
+           (cite-regexp (rx (regexp (regexp-opt (mapcar #'car cite-conversions) t))
+                            ":" (group (+ (not (any "\n   ,.)]}")))))))
+      (save-excursion
+        (goto-char (point-min))
+        (while (re-search-forward cite-regexp nil t)
+          (message (format "[cite%s:@%s]"
+                                 (cdr (assoc (match-string 1) cite-conversions))
+                                 (match-string 2)))
+          (replace-match (format "[cite%s:@%s]"
+                                 (cdr (assoc (match-string 1) cite-conversions))
+                                 (match-string 2))))))))
 #+end_src
 
 ***** cdlatex
@@ -9126,8 +9113,7 @@ no modeline.
 
 I'll just set this to be within =Organisation= folder for now, in the future it
 could be worth seeing if I could hook this up to a [[https://nextcloud.com/][Nextcloud]] instance.
-
-#+begin_src emacs-lisp
+#+begin_src emacs-lisp :noweb-ref none :tangle yes
 (setq org-roam-directory "~/orgfiles/org/roam/")
 #+end_src
 
@@ -9138,7 +9124,6 @@ Unpin Org Roam to checkout the latest release
 That said, if the directory doesn't exist we likely don't want to be using roam.
 Since we don't want to trigger errors (which will happen as soon as roam tries
 to initialise), let's not load roam.
-
 #+begin_src emacs-lisp :noweb-ref none :tangle (if (file-exists-p "~/orgfiles/org/roam/") "no" "packages.el")
 (package! org-roam :disable t)
 #+end_src
@@ -9824,6 +9809,24 @@ Saving seconds adds up after all! (but only so much)
   (format "xkcd:%d" (+xkcd-select)))
 #+end_src
 
+***** Music
+First, we set up all the necessarily 'utility' functions.
+Disabled by changing the src language from =emacs-lisp= to =elisp=
+#+begin_src elisp
+(after! org
+  (defvar org-music-player 'mpris
+    "Music player type. Curretly only supports mpris.")
+  (defvar org-music-mpris-player "Lollypop"
+    "Name of the mpris player, used in the form org.gnome.MPRIS.")
+  (defvar org-music-track-search-method 'beets
+    "Method to find the track file from the link.")
+  (defvar org-music-beets-db "~/Music/library.db"
+    "Location of the beets DB, for when using beets as the `org-music-track-search-method'")
+  (defvar org-music-folder "~/Music/"
+    "Location of your music folder, for when using file as the `org-music-track-search-method'")
+  (defvar org-music-recognised-extensions '("flac" "mp4" "m4a" "aiff" "wav" "ogg" "aiff")
+    "When searching for files in `org-music-track-search-method', recognise these extensions as audio files.")
+
 ***** YouTube
 
 The ~[[yt:...]]~ links preview nicely, but don't export nicely. Thankfully, we can
@@ -10087,6 +10090,81 @@ If you have any idea what's going on or how to fix this /please/ get in touch.
 (setq org-inline-src-prettify-results '("⟨" . "⟩"))
 #+end_src
 
+(defvar org-fontify-inline-src-blocks-max-length 200
+  "Maximum content length of an inline src block that will be fontified.")
+
+(defun org-fontify-inline-src-blocks (limit)
+  "Try to apply `org-fontify-inline-src-blocks-1'."
+  (condition-case nil
+      (org-fontify-inline-src-blocks-1 limit)
+    (error (message "Org mode fontification error in %S at %d"
+                    (current-buffer)
+                    (line-number-at-pos)))))
+
+(defun org-fontify-inline-src-blocks-1 (limit)
+  "Fontify inline src_LANG blocks, from `point' up to LIMIT."
+  (let ((case-fold-search t)
+        (initial-point (point)))
+    (while (re-search-forward "\\_<src_\\([^ \t\n[{]+\\)[{[]?" limit t) ; stolen from `org-element-inline-src-block-parser'
+      (let ((beg (match-beginning 0))
+            pt
+            (lang-beg (match-beginning 1))
+            (lang-end (match-end 1)))
+        (remove-text-properties beg lang-end '(face nil))
+        (font-lock-append-text-property lang-beg lang-end 'face 'org-meta-line)
+        (font-lock-append-text-property beg lang-beg 'face 'shadow)
+        (font-lock-append-text-property beg lang-end 'face 'org-block)
+        (setq pt (goto-char lang-end))
+        ;; `org-element--parse-paired-brackets' doesn't take a limit, so to
+        ;; prevent it searching the entire rest of the buffer we temporarily
+        ;; narrow the active region.
+        (save-restriction
+          (narrow-to-region beg (min (point-max) limit (+ lang-end org-fontify-inline-src-blocks-max-length)))
+          (when (ignore-errors (org-element--parse-paired-brackets ?\[))
+            (remove-text-properties pt (point) '(face nil))
+            (font-lock-append-text-property pt (point) 'face 'org-block)
+            (setq pt (point)))
+          (when (ignore-errors (org-element--parse-paired-brackets ?\{))
+            (remove-text-properties pt (point) '(face nil))
+            (font-lock-append-text-property pt (1+ pt) 'face '(org-block shadow))
+            (unless (= (1+ pt) (1- (point)))
+              (if org-src-fontify-natively
+                  (org-src-font-lock-fontify-block (buffer-substring-no-properties lang-beg lang-end) (1+ pt) (1- (point)))
+                (font-lock-append-text-property (1+ pt) (1- (point)) 'face 'org-block)))
+            (font-lock-append-text-property (1- (point)) (point) 'face '(org-block shadow))
+            (setq pt (point))))
+        (when (and org-prettify-inline-results (re-search-forward "\\= {{{results(" limit t))
+          (font-lock-append-text-property pt (1+ pt) 'face 'org-block)
+          (goto-char pt))))
+    (when org-prettify-inline-results
+      (goto-char initial-point)
+      (org-fontify-inline-src-results limit))))
+
+(defun org-fontify-inline-src-results (limit)
+  (while (re-search-forward "{{{results(\\(.+?\\))}}}" limit t)
+    (remove-list-of-text-properties (match-beginning 0) (point)
+                                    '(composition
+                                      prettify-symbols-start
+                                      prettify-symbols-end))
+    (font-lock-append-text-property (match-beginning 0) (match-end 0) 'face 'org-block)
+    (let ((start (match-beginning 0)) (end (match-beginning 1)))
+      (with-silent-modifications
+        (compose-region start end (if (eq org-prettify-inline-results t) "⟨" (car org-prettify-inline-results)))
+        (add-text-properties start end `(prettify-symbols-start ,start prettify-symbols-end ,end))))
+    (let ((start (match-end 1)) (end (point)))
+      (with-silent-modifications
+        (compose-region start end (if (eq org-prettify-inline-results t) "⟩" (cdr org-prettify-inline-results)))
+        (add-text-properties start end `(prettify-symbols-start ,start prettify-symbols-end ,end))))))
+
+(defun org-fontify-inline-src-blocks-enable ()
+  "Add inline src fontification to font-lock in Org.
+Must be run as part of `org-font-lock-set-keywords-hook'."
+  (setq org-font-lock-extra-keywords
+        (append org-font-lock-extra-keywords '((org-fontify-inline-src-blocks)))))
+
+(add-hook 'org-font-lock-set-keywords-hook #'org-fontify-inline-src-blocks-enable)
+#+end_src
+
 Doom theme's extra fontification is more problematic than helpful.
 #+begin_src emacs-lisp
 (setq doom-themes-org-fontify-special-tags nil)
@@ -10097,8 +10175,12 @@ Doom theme's extra fontification is more problematic than helpful.
 It's also nice to change the character used for collapsed items (by default ~…~),
 I think ~▾~ is better for indicating 'collapsed section'.
 and add an extra ~org-bullet~ to the default list of four.
-
+I've also added some fun alternatives, just commented out.
 #+begin_src emacs-lisp
+(after! org-superstar
+  (setq org-superstar-headline-bullets-list '("◉" "○" "✸" "✿" "✤" "✜" "◆" "▶")
+        org-superstar-prettify-item-bullets t ))
+
 (setq org-ellipsis " ▾ "
       org-hide-leading-stars t
       org-priority-highest ?A
@@ -10110,47 +10192,93 @@ and add an extra ~org-bullet~ to the default list of four.
         (?D . 'all-the-icons-green)
         (?E . 'all-the-icons-blue)))
 #+end_src
-
-It's also nice to make use of the =prettify-symbols-mode= for a few Org syntactic
-tokens which we'd like to prettify that aren't covered by =org-modern= or any
-other settings.
-
+It's also nice to make use of the Unicode characters for check boxes, and other commands.
 #+begin_src emacs-lisp
 (appendq! +ligatures-extra-symbols
-          (list :list_property "∷"
-                :em_dash       "—"
-                :ellipses      "…"
-                :arrow_right   "→"
-                :arrow_left    "←"
-                :arrow_lr      "↔"
-                :properties    "⚙"
-                :end           "∎"
-                :priority_a    #("⚑" 0 1 (face all-the-icons-red))
-                :priority_b    #("⬆" 0 1 (face all-the-icons-orange))
-                :priority_c    #("■" 0 1 (face all-the-icons-yellow))
-                :priority_d    #("⬇" 0 1 (face all-the-icons-green))
-                :priority_e    #("❓" 0 1 (face all-the-icons-blue))))
-
-(defadvice! +org-init-appearance-h--no-ligatures-a ()
-  :after #'+org-init-appearance-h
-  (set-ligatures! 'org-mode nil)
-  (set-ligatures! 'org-mode
-    :list_property "::"
-    :em_dash       "---"
-    :ellipsis      "..."
-    :arrow_right   "->"
-    :arrow_left    "<-"
-    :arrow_lr      "<->"
-    :properties    ":PROPERTIES:"
-    :end           ":END:"
-    :priority_a    "[#A]"
-    :priority_b    "[#B]"
-    :priority_c    "[#C]"
-    :priority_d    "[#D]"
-    :priority_e    "[#E]"))
+          `(:checkbox      "☐"
+            :pending       "◼"
+            :checkedbox    "☑"
+            :list_property "∷"
+            :em_dash       "—"
+            :ellipses      "…"
+            :arrow_right   "→"
+            :arrow_left    "←"
+            :title         "𝙏"
+            :subtitle      "𝙩"
+            :author        "𝘼"
+            :date          "𝘿"
+            :property      "☸"
+            :options       "⌥"
+            :startup       "⏻"
+            :macro         "𝓜"
+            :html_head     "🅷"
+            :html          "🅗"
+            :latex_class   "🄻"
+            :latex_header  "🅻"
+            :beamer_header "🅑"
+            :latex         "🅛"
+            :attr_latex    "🄛"
+            :attr_html     "🄗"
+            :attr_org      "⒪"
+            :begin_quote   "❝"
+            :end_quote     "❞"
+            :caption       "☰"
+            :header        "›"
+            :results       "🠶"
+            :begin_export  "⏩"
+            :end_export    "⏪"
+            :properties    "⚙"
+            :end           "∎"
+            :priority_a   ,(propertize "⚑" 'face 'all-the-icons-red)
+            :priority_b   ,(propertize "⬆" 'face 'all-the-icons-orange)
+            :priority_c   ,(propertize "■" 'face 'all-the-icons-yellow)
+            :priority_d   ,(propertize "⬇" 'face 'all-the-icons-green)
+            :priority_e   ,(propertize "❓" 'face 'all-the-icons-blue)))
+(set-ligatures! 'org-mode
+  :merge t
+  :checkbox      "[ ]"
+  :pending       "[-]"
+  :checkedbox    "[X]"
+  :list_property "::"
+  :em_dash       "---"
+  :ellipsis      "..."
+  :arrow_right   "->"
+  :arrow_left    "<-"
+  :title         "#+title:"
+  :subtitle      "#+subtitle:"
+  :author        "#+author:"
+  :date          "#+date:"
+  :property      "#+property:"
+  :options       "#+options:"
+  :startup       "#+startup:"
+  :macro         "#+macro:"
+  :html_head     "#+html_head:"
+  :html          "#+html:"
+  :latex_class   "#+latex_class:"
+  :latex_header  "#+latex_header:"
+  :beamer_header "#+beamer_header:"
+  :latex         "#+latex:"
+  :attr_latex    "#+attr_latex:"
+  :attr_html     "#+attr_html:"
+  :attr_org      "#+attr_org:"
+  :begin_quote   "#+begin_quote"
+  :end_quote     "#+end_quote"
+  :caption       "#+caption:"
+  :header        "#+header:"
+  :begin_export  "#+begin_export"
+  :end_export    "#+end_export"
+  :results       "#+RESULTS:"
+  :property      ":PROPERTIES:"
+  :end           ":END:"
+  :priority_a    "[#A]"
+  :priority_b    "[#B]"
+  :priority_c    "[#C]"
+  :priority_d    "[#D]"
+  :priority_e    "[#E]")
+(plist-put +ligatures-extra-symbols :name "⁍")
 #+end_src
 
-While we're at it we may as well make tags prettier as well 🙂
+~org-superstar-mode~ is great. While we're at it we may as well make tags prettier as well 🙂
 #+begin_src emacs-lisp :tangle packages.el
 ;; (package! org-pretty-tags :pin "5c7521651b35ae9a7d3add4a66ae8cc176ae1c76")
 #+end_src
@@ -10198,23 +10326,16 @@ passed, and so we can override the background as discussed above.
 (add-to-list 'org-src-block-faces '("latex" (:inherit default :extend t)))
 #+end_src
 
-***** More eager rendering
-:PROPERTIES:
-:header-args:emacs-lisp: :tangle no :noweb-ref config--pkg-org-fragtog
-:END:
+***** Automatic previewing
 
-#+call: confpkg("!Pkg org-fragtog")
+It would be nice if fragments could automatically be previewed after being
+typed, and the overlays automatically showed and hidden when moving the point in
+and out of the LaTeX fragments.
 
-What's better than syntax-highlighted LaTeX is /rendered/ LaTeX though, and we can
-have this be performed automatically with =org-fragtog=.
-
-#+begin_src emacs-lisp :tangle packages.el
-(package! org-fragtog :pin "c675563af3f9ab5558cfd5ea460e2a07477b0cfd")
-#+end_src
+Thankfully, all we need to do to make this happen is use ~org-latex-preview-auto-mode~.
 
 #+begin_src emacs-lisp
-(use-package! org-fragtog
-  :hook (org-mode . org-fragtog-mode))
+(add-hook 'org-mode-hook #'org-latex-preview-auto-mode)
 #+end_src
 
 ***** Prettier rendering
@@ -10231,20 +10352,6 @@ templates to be filled in by ~org-latex-default-packages-alist~ and
 \documentclass{article}
 [DEFAULT-PACKAGES]
 [PACKAGES]
-\pagestyle{empty} % do not remove
-% The settings below are copied from fullpage.sty
-\setlength{\textwidth}{\paperwidth}
-\addtolength{\textwidth}{-3cm}
-\setlength{\oddsidemargin}{1.5cm}
-\addtolength{\oddsidemargin}{-2.54cm}
-\setlength{\evensidemargin}{\oddsidemargin}
-\setlength{\textheight}{\paperheight}
-\addtolength{\textheight}{-\headheight}
-\addtolength{\textheight}{-\headsep}
-\addtolength{\textheight}{-\footskip}
-\addtolength{\textheight}{-3cm}
-\setlength{\topmargin}{1.5cm}
-\addtolength{\topmargin}{-2.54cm}
 #+end_src
 
 To this, we make two additions:
@@ -10261,25 +10368,25 @@ To this, we make two additions:
 
 Since we can, instead of making the background colour match the =default= face,
 let's make it transparent.
+
 #+begin_src emacs-lisp
-(setq org-format-latex-options
-      (plist-put org-format-latex-options :background "Transparent"))
+(plist-put org-format-latex-options :background "Transparent")
+(plist-put org-format-latex-options :zoom 0.93) ; Calibrated based on the TeX font and org-buffer font.
 #+end_src
 
 With the background taken care of, we just need to make sure we're using the
 theme-appropriate foreground.
 
-# TODO check that this is still needed.
-
 #+begin_src emacs-lisp
-(add-hook! 'doom-load-theme-hook
-  (setq org-preview-latex-image-directory
-        (concat doom-cache-dir "org-latex/" (symbol-name doom-theme) "/"))
+(defun +org-refresh-latex-images-previews-h ()
   (dolist (buffer (doom-buffers-in-mode 'org-mode (buffer-list)))
     (with-current-buffer buffer
       (+org--toggle-inline-images-in-subtree (point-min) (point-max) 'refresh)
-      (org-clear-latex-preview (point-min) (point-max))
-      (org--latex-preview-region (point-min) (point-max)))))
+      (unless (eq org-latex-preview-default-process 'dvisvgm)
+        (org-clear-latex-preview (point-min) (point-max))
+        (org--latex-preview-region (point-min) (point-max))))))
+
+(add-hook 'doom-load-theme-hook #'+org-refresh-latex-images-previews-h)
 #+end_src
 
 ***** Rendering speed tests
@@ -10291,9 +10398,7 @@ We can either render from a ~dvi~ or ~pdf~ file, so let's benchmark ~latex~ and
 | 135 \pm 2 ms | 215 \pm 3 ms    |
 
 On the rendering side, there are two ~.dvi~-to-image converters which I am
-interested in: ~dvipng~ and ~dvisvgm~. Then with the a ~.pdf~ we have ~pdf2svg~.
-For inline preview we care about speed, while for exporting we care about file
-size and prefer a vector graphic.
+interested in: ~dvipng~ and ~dvisvgm~.
 
 Using the above latex expression and benchmarking lead to the following results:
 | ~dvipng~ time | ~dvisvgm~ time | ~pdf2svg~ time |
@@ -10301,7 +10406,7 @@ Using the above latex expression and benchmarking lead to the following results:
 | 89 \pm 2 ms   | 178 \pm 2 ms   | 12 \pm 2 ms    |
 
 Now let's combine this to see what's best
-| Tool chain         | Total time | Resultant file size |
+| Tool chain         | Total time | Resulting file size |
 |--------------------+------------+---------------------|
 | ~latex~ + ~dvipng~     | 226 \pm 2 ms | 7 KiB               |
 | ~latex~ + ~dvisvgm~    | 392 \pm 4 ms | 8 KiB               |
@@ -10312,122 +10417,6 @@ So, let's use ~dvipng~ for previewing LaTeX fragments in-Emacs, but ~dvisvgm~ fo
 #+begin_warning
 Unfortunately, it seems that SVG sizing is annoying ATM, so let's actually not do this right now.
 #+end_warning
-
-**** Stolen from [[https://github.com/jkitchin/scimax][scimax]] (semi-working right now)
-
-I want fragment justification
-#+begin_src emacs-lisp
-(defun scimax-org-latex-fragment-justify (justification)
-  "Justify the latex fragment at point with JUSTIFICATION.
-JUSTIFICATION is a symbol for 'left, 'center or 'right."
-  (interactive
-   (list (intern-soft
-          (completing-read "Justification (left): " '(left center right)
-                           nil t nil nil 'left))))
-  (let* ((ov (ov-at))
-         (beg (ov-beg ov))
-         (end (ov-end ov))
-         (shift (- beg (line-beginning-position)))
-         (img (overlay-get ov 'display))
-         (img (and (and img (consp img) (eq (car img) 'image)
-                        (image-type-available-p (plist-get (cdr img) :type)))
-                   img))
-         space-left offset)
-    (when (and img
-               ;; This means the equation is at the start of the line
-               (= beg (line-beginning-position))
-               (or
-                (string= "" (s-trim (buffer-substring end (line-end-position))))
-                (eq 'latex-environment (car (org-element-context)))))
-      (setq space-left (- (window-max-chars-per-line) (car (image-size img)))
-            offset (floor (cond
-                           ((eq justification 'center)
-                            (- (/ space-left 2) shift))
-                           ((eq justification 'right)
-                            (- space-left shift))
-                           (t
-                            0))))
-      (when (>= offset 0)
-        (overlay-put ov 'before-string (make-string offset ?\ ))))))
-
-(defun scimax-org-latex-fragment-justify-advice (beg end image imagetype)
-  "After advice function to justify fragments."
-  (scimax-org-latex-fragment-justify (or (plist-get org-format-latex-options :justify) 'left)))
-
-
-(defun scimax-toggle-latex-fragment-justification ()
-  "Toggle if LaTeX fragment justification options can be used."
-  (interactive)
-  (if (not (get 'scimax-org-latex-fragment-justify-advice 'enabled))
-      (progn
-        (advice-add 'org--format-latex-make-overlay :after 'scimax-org-latex-fragment-justify-advice)
-        (put 'scimax-org-latex-fragment-justify-advice 'enabled t)
-        (message "Latex fragment justification enabled"))
-    (advice-remove 'org--format-latex-make-overlay 'scimax-org-latex-fragment-justify-advice)
-    (put 'scimax-org-latex-fragment-justify-advice 'enabled nil)
-    (message "Latex fragment justification disabled")))
-#+end_src
-There's also this lovely equation numbering stuff I'll nick
-#+begin_src emacs-lisp
-;; Numbered equations all have (1) as the number for fragments with vanilla
-;; org-mode. This code injects the correct numbers into the previews so they
-;; look good.
-(defun scimax-org-renumber-environment (orig-func &rest args)
-  "A function to inject numbers in LaTeX fragment previews."
-  (let ((results '())
-        (counter -1)
-        (numberp))
-    (setq results (cl-loop for (begin . env) in
-                           (org-element-map (org-element-parse-buffer) 'latex-environment
-                             (lambda (env)
-                               (cons
-                                (org-element-property :begin env)
-                                (org-element-property :value env))))
-                           collect
-                           (cond
-                            ((and (string-match "\\\\begin{equation}" env)
-                                  (not (string-match "\\\\tag{" env)))
-                             (cl-incf counter)
-                             (cons begin counter))
-                            ((string-match "\\\\begin{align}" env)
-                             (prog2
-                                 (cl-incf counter)
-                                 (cons begin counter)
-                               (with-temp-buffer
-                                 (insert env)
-                                 (goto-char (point-min))
-                                 ;; \\ is used for a new line. Each one leads to a number
-                                 (cl-incf counter (count-matches "\\\\$"))
-                                 ;; unless there are nonumbers.
-                                 (goto-char (point-min))
-                                 (cl-decf counter (count-matches "\\nonumber")))))
-                            (t
-                             (cons begin nil)))))
-
-    (when (setq numberp (cdr (assoc (point) results)))
-      (setf (car args)
-            (concat
-             (format "\\setcounter{equation}{%s}\n" numberp)
-             (car args)))))
-
-  (apply orig-func args))
-
-
-(defun scimax-toggle-latex-equation-numbering ()
-  "Toggle whether LaTeX fragments are numbered."
-  (interactive)
-  (if (not (get 'scimax-org-renumber-environment 'enabled))
-      (progn
-        (advice-add 'org-create-formula-image :around #'scimax-org-renumber-environment)
-        (put 'scimax-org-renumber-environment 'enabled t)
-        (message "Latex numbering enabled"))
-    (advice-remove 'org-create-formula-image #'scimax-org-renumber-environment)
-    (put 'scimax-org-renumber-environment 'enabled nil)
-    (message "Latex numbering disabled.")))
-
-(advice-add 'org-create-formula-image :around #'scimax-org-renumber-environment)
-(put 'scimax-org-renumber-environment 'enabled t)
-#+end_src
 
 **** Org Plot
 
@@ -11589,6 +11578,15 @@ The default checkboxes look rather ugly, so let's provide some prettier alternat
 \newcommand{\checkboxChecked}{\rlap{\raisebox{0.2ex}{\hspace{0.35ex}\scriptsize \ding{52}}}$\square$}
 #+end_src
 
+We set up a maths typesetting preamble [[*Maths notation conveniences][later on]], but it would be nice to save it
+to a variable here:
+
+#+begin_src emacs-lisp :noweb no-export :noweb-prefix no
+(defvar org-latex-maths-preamble
+  <<grab("latex-maths-conveniences")>>
+  "Preamble that sets up a bunch of mathematical conveniences.")
+#+end_src
+
 It's nice to have "message blocks", things like info/warning/error/success.
 A LaTeX macro should make them trivial to create.
 
@@ -11666,9 +11664,18 @@ can embed whatever we want.
        (lambda (src)
          (when (and (not (org-in-commented-heading-p nil src))
                     (not (org-in-archived-heading-p nil src)))
-           (when-let ((params (org-babel-parse-header-arguments
-                               (org-element-property :parameters src) t))
-                      (lang (org-element-property :language src))
+           (when-let ((lang (org-element-property :language src))
+                      (params
+                       (apply
+                        #'org-babel-merge-params
+                        (append
+                         (org-with-point-at (org-element-property :begin src)
+                           (org-babel-params-from-properties lang t))
+                         (mapcar
+                          (lambda (h)
+                            (org-babel-parse-header-arguments h t))
+                          (cons (org-element-property :parameters src)
+                                (org-element-property :header src))))))
                       (tangle-value
                        (pcase (alist-get :tangle params)
                          ((and (pred stringp) (pred (string-match-p "^(.*)$")) expr)
@@ -11878,7 +11885,7 @@ There are also some obsolete entries in the default value, specifically
 (setq org-latex-default-packages-alist
       '(("AUTO" "inputenc" t ("pdflatex"))
         ("T1" "fontenc" t ("pdflatex"))
-        ("" "xcolor" nil) ; Generally useful
+        ("" "xcolor" t) ; Generally useful
         ("" "hyperref" nil)))
 #+end_src
 
@@ -12107,32 +12114,30 @@ Derivatives are actually a bit of a pain to typeset, it would be nice to have a
 + =\dv{f}{x}= for the derivative of =f= with respect to =x=
 + =\dv[2]{f}{x}= for the second order derivative of =f= with respect to =x=
 
-Similarly, it would be nice to have a partial derivate counterpart =\pdv= which behaves
-the same way.
+Similarly, it would be nice to have a partial derivate counterpart =\pdv= which
+behaves in a similar way, but with the possibility of providing multiple
+comma-delimited variables --- e.g. =\pdv{f}{x,y,z}=.
 
 #+begin_src LaTeX
 % Easy derivatives
 \ProvideDocumentCommand\dv{o m g}{%
-  \ensuremath{%
-    \IfValueTF{#3}{%
-      \IfNoValueTF{#1}{%
-        \frac{\dd #2}{\dd #3}%
-      }{\frac{\dd^{#1} #2}{\dd #3^{#1}}%
-      }}{%
-      \IfNoValueTF{#1}{%
-        \frac{\dd}{\dd #2}%
-      }{\frac{\dd^{#1}}{\dd #2^{#1}}}}}}
+  \IfNoValueTF{#3}{%
+    \dv[#1]{}{#2}}{%
+    \IfNoValueTF{#1}{%
+      \frac{\dd #2}{\dd #3}%
+    }{\frac{\dd[#1] #2}{\dd {#3}^{#1}}}}}
 % Easy partial derivatives
+\ExplSyntaxOn
 \ProvideDocumentCommand\pdv{o m g}{%
-  \ensuremath{%
-    \IfValueTF{#3}{%
-      \IfNoValueTF{#1}{%
-        \frac{\partial #2}{\partial #3}%
-      }{\frac{\partial^{#1} #2}{\partial #3^{#1}}%
-      }}{%
-      \IfNoValueTF{#1}{%
-        \frac{\partial}{\partial #2}%
-      }{\frac{\partial^{#1}}{\partial #2^{#1}}}}}}
+  \IfNoValueTF{#3}{\pdv[#1]{}{#2}}%
+  {\ifnum\clist_count:n{#3}<2
+    \IfValueTF{#1}{\frac{\partial^{#1} #2}{\partial {#3}^{#1}}}%
+    {\frac{\partial #2}{\partial #3}}
+    \else
+    \frac{\IfValueTF{#1}{\partial^{#1}}{\partial^{\clist_count:n{#3}}}#2}%
+    {\clist_map_inline:nn{#3}{\partial ##1 \,}\!}
+    \fi}}
+\ExplSyntaxOff
 #+end_src
 
 ***** Common operators
@@ -12184,7 +12189,7 @@ argument of the environment, and default to right-alignment.
 Determining an appropriate styling for a derivative "d" (e.g. "dx") is
 surprisingly hard, as the "d" is neither:
 + An operator (which are typeset as upright roman)
-+ A variable (which are typet as italic roman)
++ A variable (which are typeset as italic roman)
 
 The ISO 80000-2 standard (2009) specifies that it should be upright, however (a)
 it is still not an operator, (b) not used in any maths book I've seen, and (c)
@@ -12198,20 +12203,24 @@ that slants a "d".
 
 #+begin_src LaTeX
 % Slanted roman "d" for derivatives
-\ifnum\pdfoutput<1 % DVI
+\ifcsname pdfoutput\endcsname
+  \ifnum\pdfoutput>0 % PDF
+    \newsavebox\diffdbox{}
+    \newcommand{\slantedromand}{{\mathpalette\makesl{d}}}
+    \newcommand{\makesl}[2]{%
+      \begingroup
+      \sbox{\diffdbox}{$\mathsurround=0pt#1\mathrm{#2}$}%
+      \pdfsave%
+      \pdfsetmatrix{1 0 0.2 1}%
+      \rlap{\usebox{\diffdbox}}%
+      \pdfrestore%
+      \hskip\wd\diffdbox%
+      \endgroup}
+  \else % DVI
+    \newcommand{\slantedromand}{d} % fallback
+  \fi
+\else % Also DVI
   \newcommand{\slantedromand}{d} % fallback
-\else % PDF
-  \newsavebox\diffdbox{}
-  \newcommand{\slantedromand}{{\mathpalette\makesl{d}}}
-  \newcommand{\makesl}[2]{%
-    \begingroup
-    \sbox{\diffdbox}{$\mathsurround=0pt#1\mathrm{#2}$}%
-    \pdfsave%
-    \pdfsetmatrix{1 0 0.2 1}%
-    \rlap{\usebox{\diffdbox}}%
-    \pdfrestore%
-    \hskip\wd\diffdbox%
-    \endgroup}
 \fi
 #+end_src
 
@@ -12228,6 +12237,18 @@ it. After much fiddling, I've ended up with the following.
     \slantedromand\hspace{0.2ex}^{#1}
   \fi}
 \makeatother
+#+end_src
+
+While =\dd= isn't much effort to type, it would be much cleaner to be able to do
+src_LaTeX{\int x^2 \d x}. The problem with defining =\d= is that it is already used
+for the under-dot accent. However, since this is a text-mode (only) accent, and
+defined with src_LaTeX{\@dec@text@cmd\newcommand} instead of
+src_LaTeX{\DeclareRobustCommand} we can redefine the command to mean =\dd= in
+math-mode.
+
+#+begin_src LaTeX
+\NewCommandCopy{\daccent}{\d}
+\renewcommand{\d}{\ifmmode\dd\else\daccent\fi}
 #+end_src
 
 **** Cover page
@@ -12386,10 +12407,137 @@ exporting that as LaTeX commands.
   :after ox-latex)
 #+end_src
 
-Using this as in LaTeX exports is now as easy as
+Thanks to ~org-latex-conditional-features~ and some copy-paste with the =minted=
+entry in ~org-latex-scr-block~ we can easily add this as a recognised
+~org-latex-listings~ value.
 
-#+begin_src emacs-lisp
-(setq org-latex-listings 'engraved)
+#+begin_src emacs-lisp :noweb no-export
+(defadvice! org-latex-src-block-engraved (orig-fn src-block contents info)
+  "Like `org-latex-src-block', but supporting an engraved backend"
+  :around #'org-latex-src-block
+  (if (eq 'engraved (plist-get info :latex-listings))
+      (org-latex-scr-block--engraved src-block contents info)
+    (funcall orig-fn src-block contents info)))
+
+(defadvice! org-latex-inline-src-block-engraved (orig-fn inline-src-block contents info)
+  "Like `org-latex-inline-src-block', but supporting an engraved backend"
+  :around #'org-latex-inline-src-block
+  (if (eq 'engraved (plist-get info :latex-listings))
+      (org-latex-inline-scr-block--engraved inline-src-block contents info)
+    (funcall orig-fn src-block contents info)))
+
+(defvar-local org-export-has-code-p nil)
+
+(defadvice! org-export-expect-no-code (&rest _)
+  :before #'org-export-as
+  (setq org-export-has-code-p nil))
+
+(defadvice! org-export-register-code (&rest _)
+  :after #'org-latex-src-block-engraved
+  :after #'org-latex-inline-src-block-engraved
+  (setq org-export-has-code-p t))
+
+(setq org-latex-engraved-code-preamble "
+<<org-latex-engraved-code-preamble>>
+")
+
+(add-to-list 'org-latex-conditional-features '((and org-export-has-code-p "^[ \t]*#\\+begin_src\\|^[ \t]*#\\+BEGIN_SRC\\|src_[A-Za-z]") . engraved-code) t)
+(add-to-list 'org-latex-conditional-features '("^[ \t]*#\\+begin_example\\|^[ \t]*#\\+BEGIN_EXAMPLE" . engraved-code-setup) t)
+(add-to-list 'org-latex-feature-implementations '(engraved-code :requires engraved-code-setup :snippet (engrave-faces-latex-gen-preamble) :order 99) t)
+(add-to-list 'org-latex-feature-implementations '(engraved-code-setup :snippet org-latex-engraved-code-preamble :order 98) t)
+
+(defun org-latex-scr-block--engraved (src-block contents info)
+  (let* ((lang (org-element-property :language src-block))
+         (attributes (org-export-read-attribute :attr_latex src-block))
+         (float (plist-get attributes :float))
+         (num-start (org-export-get-loc src-block info))
+         (retain-labels (org-element-property :retain-labels src-block))
+         (caption (org-element-property :caption src-block))
+         (caption-above-p (org-latex--caption-above-p src-block info))
+         (caption-str (org-latex--caption/label-string src-block info))
+         (placement (or (org-unbracket-string "[" "]" (plist-get attributes :placement))
+                        (plist-get info :latex-default-figure-position)))
+         (float-env
+          (cond
+           ((string= "multicolumn" float)
+            (format "\\begin{listing*}[%s]\n%s%%s\n%s\\end{listing*}"
+                    placement
+                    (if caption-above-p caption-str "")
+                    (if caption-above-p "" caption-str)))
+           (caption
+            (format "\\begin{listing}[%s]\n%s%%s\n%s\\end{listing}"
+                    placement
+                    (if caption-above-p caption-str "")
+                    (if caption-above-p "" caption-str)))
+           ((string= "t" float)
+            (concat (format "\\begin{listing}[%s]\n"
+                            placement)
+                    "%s\n\\end{listing}"))
+           (t "%s")))
+         (options (plist-get info :latex-minted-options))
+         (content-buffer
+          (with-temp-buffer
+            (insert
+             (let* ((code-info (org-export-unravel-code src-block))
+                    (max-width
+                     (apply 'max
+                            (mapcar 'length
+                                    (org-split-string (car code-info)
+                                                      "\n")))))
+               (org-export-format-code
+                (car code-info)
+                (lambda (loc _num ref)
+                  (concat
+                   loc
+                   (when ref
+                     ;; Ensure references are flushed to the right,
+                     ;; separated with 6 spaces from the widest line
+                     ;; of code.
+                     (concat (make-string (+ (- max-width (length loc)) 6)
+                                          ?\s)
+                             (format "(%s)" ref)))))
+                nil (and retain-labels (cdr code-info)))))
+            (funcall (org-src-get-lang-mode lang))
+            (engrave-faces-latex-buffer)))
+         (content
+          (with-current-buffer content-buffer
+            (buffer-string)))
+         (body
+          (format
+           "\\begin{Code}\n\\begin{Verbatim}[%s]\n%s\\end{Verbatim}\n\\end{Code}"
+           ;; Options.
+           (concat
+            (org-latex--make-option-string
+             (if (or (not num-start) (assoc "linenos" options))
+                 options
+               (append
+                `(("linenos")
+                  ("firstnumber" ,(number-to-string (1+ num-start))))
+                options)))
+            (let ((local-options (plist-get attributes :options)))
+              (and local-options (concat "," local-options))))
+           content)))
+    (kill-buffer content-buffer)
+    ;; Return value.
+    (format float-env body)))
+
+(defun org-latex-inline-scr-block--engraved (inline-src-block _contents info)
+  (let ((options (org-latex--make-option-string
+                  (plist-get info :latex-minted-options)))
+        code-buffer code)
+    (setq code-buffer
+          (with-temp-buffer
+            (insert (org-element-property :value inline-src-block))
+            (funcall (org-src-get-lang-mode
+                      (org-element-property :language inline-src-block)))
+            (engrave-faces-latex-buffer)))
+    (setq code (with-current-buffer code-buffer
+                 (buffer-string)))
+    (kill-buffer code-buffer)
+    (format "\\Verb%s{%s}"
+            (if (string= options "") ""
+              (format "[%s]" options))
+            code)))
 #+end_src
 
 One little annoyance with this is the interaction between microtype and =Verbatim=
